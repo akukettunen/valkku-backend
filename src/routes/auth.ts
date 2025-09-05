@@ -1,64 +1,68 @@
 import { Router, Request, Response } from 'express';
-import { validate } from '../middleware/validation';
-import { loginSchema } from '@/schemas/auth';
-import dotenv from 'dotenv';
-import axios from 'axios';
-
-dotenv.config();
+import { validate } from '@/middleware/validation';
+import {
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  type RegisterInput,
+  type LoginInput,
+  type UpdateProfileInput,
+  type ChangePasswordInput
+} from '@/schemas/auth';
 
 const router: Router = Router();
 
-// POST /auth/login - User login
-router.post(
-  "/login",
-  validate(loginSchema),
-  async (req: Request, res: Response) => {
-    const { email, password } = req.body;
+// POST /auth/register - User registration
+router.post('/register', validate(registerSchema), async (req: Request, res: Response) => {
+  try {
+    const { email, password, name }: RegisterInput = req.body;
 
-    try {
-      // Step 1: Start sign-in flow
-      const signInResp = await axios.post("https://api.clerk.dev/v1/sign_ins",
-        { identifier: email },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env['CLERK_SECRET_KEY']}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    // TODO: Add user creation logic
+    // TODO: Hash password
+    // TODO: Save to database
 
-      const signInId = signInResp.data.id;
-
-      // Step 2: Attempt password factor
-      const attemptResp = await axios.post(
-        `https://api.clerk.dev/v1/sign_ins/${signInId}/attempt_first_factor`,
-        { strategy: "password", password },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env['CLERK_SECRET_KEY']}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const attempt = attemptResp.data;
-
-      if (attempt.status === "complete") {
-        return res.json({
-          success: true,
-          sessionId: attempt.created_session_id,
-          userId: attempt.user_id,
-        });
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        email,
+        name
       }
-
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
-    } catch (err: any) {
-      console.error(err.response?.data || err.message);
-      return res
-        .status(400)
-        .json({ success: false, error: err.response?.data || err.message });
-    }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during registration'
+    });
   }
-);
+});
+
+// POST /auth/login - User login
+router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
+  try {
+    const { email, password }: LoginInput = req.body;
+
+    // TODO: Add authentication logic
+    // TODO: Verify credentials
+    // TODO: Generate JWT token
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        email,
+        token: 'jwt_token_here' // TODO: Replace with actual JWT token
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during login'
+    });
+  }
+});
 
 export default router;

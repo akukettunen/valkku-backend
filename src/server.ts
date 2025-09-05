@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import authRoutes from '@/routes/auth';
-import { clerkMiddleware } from '@clerk/express'
 
 // Load environment variables
 dotenv.config();
@@ -18,7 +17,6 @@ app.use(morgan('combined')); // HTTP request logging
 app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use(clerkMiddleware()); // Clerk middleware
 
 // Basic route
 app.get('/', (_req: Request, res: Response) => {

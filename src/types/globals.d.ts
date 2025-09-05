@@ -1,1 +1,1 @@
-/// <reference types="@clerk/express/env" />
+// Global type definitions
