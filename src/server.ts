@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import authRoutes from '@/routes/auth';
+import webhookRoutes from '@/routes/webhook';
 
 // Load environment variables
 dotenv.config();
@@ -45,8 +46,9 @@ app.get('/api/status', (_req: Request, res: Response) => {
   });
 });
 
-// Mount auth routes
+// Mount routes
 app.use('/api/auth', authRoutes);
+app.use('/webhook', webhookRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: Function) => {

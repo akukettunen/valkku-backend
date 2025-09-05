@@ -113,3 +113,7 @@ The build process compiles TypeScript to JavaScript in the `dist/` folder, ready
 ## 📄 License
 
 ISC License
+
+NGROK
+Log in with google
+ngrok https 8333
