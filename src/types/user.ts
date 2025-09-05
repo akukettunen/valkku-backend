@@ -7,6 +7,7 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
+  emojiClickedCount: number;
 }
 
 // Helper type to exclude sensitive fields from public responses
