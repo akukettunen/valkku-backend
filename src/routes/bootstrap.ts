@@ -2,35 +2,21 @@ import { Router, Request, Response } from 'express';
 
 const router: Router = Router();
 
-// POST /webhook - Webhook endpoint that logs request body
-router.post('/', async (req: Request, res: Response) => {
-  if(!req.headers.authorization) {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized'
-    });
-  }
-
-  if(req.headers.authorization.split(' ')[1] !== process.env['WEBHOOK_SECRET']) {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized'
-    });
-  }
-
+// PUT /bootstrap - Bootstrap endpoint that logs request body
+router.put('/', async (req: Request, res: Response) => {
   try {
-    console.log('=== Webhook Request Received ===');
+    console.log('=== Bootstrap Request Received ===');
     console.log('Method:', req.method);
     console.log('URL:', req.url);
     console.log('Headers:', req.headers);
     console.log('Query Params:', req.query);
     console.log('Body:', req.body);
     console.log('Timestamp:', new Date().toISOString());
-    console.log('================================');
+    console.log('===================================');
 
     return res.status(200).json({
       success: true,
-      message: 'Webhook received successfully',
+      message: 'Bootstrap received successfully',
       timestamp: new Date().toISOString(),
       receivedData: {
         method: req.method,
@@ -41,10 +27,10 @@ router.post('/', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Webhook error:', error);
+    console.error('Bootstrap error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error in webhook handler'
+      message: 'Internal server error in bootstrap handler'
     });
   }
 });

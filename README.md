@@ -117,3 +117,42 @@ ISC License
 NGROK
 Log in with google
 ngrok https 8333
+
+## Example webhooks (req.body)
+```js
+{
+  specversion: '1.0',
+  id: 'evt_wW4bGMiZfHhpMLPFHjVJ41',
+  source: 'urn:auth0:valkku.eu.auth0.com',
+  type: 'user.created',
+  time: '2025-09-05T16:42:25.267Z',
+  data: {
+    object: {
+      user_id: 'auth0|507f1f77bcf86cd799439020',
+      email: 'john.doe@gmail.com',
+      email_verified: false,
+      username: 'johndoe',
+      phone_number: '+15555555555',
+      phone_verified: false,
+      created_at: '2025-02-01T12:34:56Z',
+      updated_at: '2025-02-01T12:34:56Z',
+      identities: [Array],
+      app_metadata: [Object],
+      user_metadata: [Object],
+      picture: 'https://secure.gravatar.com/avatar/15626c5e0c749cb912f9d1ad48dba440?s=480&r=pg&d=https%3A%2F%2Fssl.gstatic.com%2Fs2%2Fprofiles%2Fimages%2Fsilhouette80.png',
+      name: 'John Doe',
+      nickname: 'John Doe',
+      multifactor: [Array],
+      last_ip: '10.0.0.1',
+      last_login: '2025-02-01T12:34:56Z',
+      logins_count: 42,
+      blocked: false,
+      given_name: 'John',
+      family_name: 'Doe'
+    }
+  },
+  a0purpose: 'test',
+  a0stream: 'est_hhPLSs3gHbf5PAMKCsvwER',
+  a0tenant: 'valkku'
+}
+```
