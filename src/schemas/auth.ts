@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { emailSchema, passwordSchema, nameSchema } from './common';
 
-// Profile update schema
+export const bootstrapUserSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required')
+})
+
 export const updateProfileSchema = z.object({
   name: nameSchema.optional(),
   email: emailSchema.optional()
@@ -9,7 +13,6 @@ export const updateProfileSchema = z.object({
   message: 'At least one field must be provided for update'
 });
 
-// Password change schema
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: passwordSchema

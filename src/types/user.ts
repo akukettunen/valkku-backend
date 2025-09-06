@@ -1,14 +1,15 @@
-export interface User {
-  id: string;
-  email: string;
-  name: string;
+export interface PrivateUser {
+  id: number;
+  auth0Id: string;
+  firstName: string;
+  lastName: string;
   pendingDetails: boolean;
   pendingJoinTeam: boolean;
   createdAt: Date;
   updatedAt: Date;
-  isActive: boolean;
   emojiClickedCount: number;
+  password: string;
 }
 
 // Helper type to exclude sensitive fields from public responses
-export type PublicUser = Omit<User, 'password'>;
+export type PublicUser = Omit<PrivateUser, 'password'>;
