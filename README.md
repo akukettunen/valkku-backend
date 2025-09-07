@@ -118,6 +118,8 @@ NGROK
 Log in with google
 ngrok https 8333
 
+Auth0 guthub login
+
 ## Example webhooks (req.body)
 ```js
 {

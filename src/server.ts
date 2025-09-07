@@ -1,11 +1,16 @@
+/// <reference path="./types/express.d.ts" />
+
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import { promisePoolEnd } from '@/db';
+
+// Routes
 import authRoutes from '@/routes/auth';
 import bootstrapRoutes from '@/routes/bootstrap';
-import { promisePoolEnd } from '@/db';
+import userRoutes from '@/routes/user';
 
 // Load environment variables
 dotenv.config();
@@ -50,6 +55,7 @@ app.get('/api/status', (_req: Request, res: Response) => {
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bootstrap', bootstrapRoutes);
+app.use('/api/user', userRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: Function) => {
