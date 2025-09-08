@@ -6,6 +6,7 @@ Team:
 - teamMember
 - teamGuardian
 - teamAthlete
+- coach
 
 Individual:
 - self
@@ -13,16 +14,22 @@ Individual:
 */
 
 export default {
-  team: { // actions regarding the team
+  "team": { // actions regarding the team
     "team:delete": ["owner"],
-    "team:read": ["owner","admin", "member"],
+    "team:read":  ["owner","admin", "member"],
     "team:update": ["owner", "admin"],
-    "event:create": ["admin", "coach"]
+    "team:invite": ["owner", "admin"],
+    "team:leave": ["owner", "admin", "member", "guardian"],
+    "membership:remove": ["owner", "admin"], // owner membership cannot be removed
+    "membership:read": ["owner", "admin", "coach"],
+    "team:transfer_ownership": ["owner"],
+    "event:create": ["owner", "admin", "coach"],
   },
-  individual: { // actions regarding ones own stuff
-    "event:create": [ "self", "guardian"],
+  "individual": { // actions regarding ones own stuff
+    "event:create": [ "self", "guardian"], // create event for self or guarded athlete
     "event:read": [ "self", "guardian"],
     "event:update": [ "self", "guardian"],
-    "event:delete": [ "self", "guardian"],
+    "event:remove": [ "self", "guardian"],
+    "membership:remove": ["self"],
   }
 }

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { User } from '@/types/user';
+import { User, PublicUser } from '@/types/user';
 import { requireAuth } from '@/middleware/auth';
 import { getUserByAuth0Id, initializeUser } from '@/db/user';
+import { getPublicUserByAuth0Id } from '@/utils/userHelper';
 
 const router: Router = Router();
 
@@ -25,46 +26,24 @@ router.put('/', requireAuth, async (req: Request, res: Response) => {
 
     if (existingUsers.length > 0) {
       // User exists, return user data without password
-      const user = existingUsers[0] as User;
-      const publicUser: User = {
-        id: user.id,
-        auth0Id: user.auth0Id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        pendingDetails: user.pendingDetails,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        emojiClickedCount: user.emojiClickedCount
-      };
+      const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
 
       return res.status(200).json({
         success: true,
         message: 'User found',
-        data: publicUser
+        data: user
       });
     } else {
       // User doesn't exist, create new user
-      const newUser = await initializeUser(auth0Id);
+      await initializeUser(auth0Id);
 
       // Fetch the created user to return complete data
-      const createdUsers = await getUserByAuth0Id(auth0Id) as User[];
-      const user = createdUsers[0] as User;
-
-      const publicUser: User = {
-        id: user.id,
-        auth0Id: user.auth0Id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        pendingDetails: user.pendingDetails,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        emojiClickedCount: user.emojiClickedCount
-      };
+      const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
 
       return res.status(201).json({
         success: true,
         message: 'User created successfully',
-        data: publicUser
+        data: user
       });
     }
   } catch (error) {

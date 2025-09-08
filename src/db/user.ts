@@ -14,8 +14,7 @@ export const getUserById = async (id: string) => {
 };
 
 export const getUserByAuth0Id = async (auth0Id: string) => {
-  const result = await query('SELECT * FROM users WHERE auth0Id = ?', [auth0Id]);
-  return result;
+  return query('SELECT * FROM users WHERE auth0Id = ?', [auth0Id]);
 };
 
 export const initializeUser = async (auth0Id: string) => {
@@ -59,5 +58,14 @@ export const updateUserDetails = async (updates: { emojiClickedCount?: number; f
   const result = await query(`
     UPDATE users SET ${fields.join(', ')}, updatedAt = NOW() WHERE id = ?
   `, values);
+  return result;
+};
+
+export const getUserTeams = async (userId: number) => {
+  const result = await query(`
+    SELECT team_users.*, teams.* FROM team_users
+    LEFT JOIN teams ON team_users.teamId = teams.id
+    WHERE team_users.userId = ?;
+  `, [userId]);
   return result;
 };

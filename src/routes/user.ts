@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { User } from '@/types/user';
+import { PublicUser, User } from '@/types/user';
 import { bootstrapUserSchema } from '@/schemas/auth';
 import { validate } from '@/middleware/validation';
 import { patchUserSchema } from '@/schemas/user';
 import { requireAuth } from '@/middleware/auth';
-import { getUserByAuth0Id, initializeUser, updateUserDetails } from '@/db/user';
+import { getUserByAuth0Id, updateUserDetails } from '@/db/user';
+import { getPublicUserByAuth0Id } from '@/utils/userHelper';
 
 const router: Router = Router();
 
@@ -14,21 +15,21 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     const auth0Id = req.auth0Id!;
 
     // Check if user exists
-    const [ user] = await getUserByAuth0Id(auth0Id) as User[];
+    const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
 
-    if (user) {
-      // User exists, return user data without password
-      return res.status(200).json({
-        success: true,
-        message: 'User found',
-        data: user
-      });
-    } else {
+    if(!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
+
+      // User exists, return user data without password
+    return res.status(200).json({
+      success: true,
+      message: 'User found',
+      data: user
+    });
   } catch (error) {
     console.error('Bootstrap error:', error);
     return res.status(500).json({
@@ -64,7 +65,15 @@ router.patch('/', requireAuth, validate(patchUserSchema), async (req: Request, r
     await updateUserDetails(updates, user.id);
 
     // Fetch updated user data
-    const [ updatedUser ] = await getUserByAuth0Id(req.auth0Id!) as User[];
+    const updatedUser = await getPublicUserByAuth0Id(req.auth0Id!);
+
+    if(!updatedUser) {
+      return res.json({
+        success: false,
+        message: 'Updated user not found',
+        data: null
+      })
+    }
 
     return res.status(200).json({
       success: true,

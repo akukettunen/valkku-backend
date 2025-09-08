@@ -1,6 +1,9 @@
 import { auth } from "express-oauth2-jwt-bearer";
 import { Request, Response, NextFunction } from "express";
+import scopes from "@/utils/scopes";
 import dotenv from "dotenv";
+import { TeamUser } from "@/types/team";
+import { getTeamUserByAuth0IdAndTeamId } from "@/db/team";
 
 dotenv.config();
 
@@ -44,3 +47,24 @@ function attachAuth0User(req: Request, res: Response, next: NextFunction) {
 
 // 4. Export a combined middleware
 export const requireAuth = [checkJwt, attachAuth0User];
+
+export const authorize = (scopeString: string, scope: 'team' | 'individual') => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const auth0Id = req.auth0Id;
+    const teamId = req.params['teamId'] || req.body['teamId'];
+
+    const [ teamUser ] = await getTeamUserByAuth0IdAndTeamId(auth0Id!, teamId) as TeamUser[];
+
+    if(!teamUser) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    const allowedScopes = scopes[scope][scopeString as keyof typeof scopes[typeof scope]]; // Get the allowed users scoped for this action
+    if(allowedScopes.includes(teamUser.role)) {
+      next();
+      return;
+    } else {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+  };
+};

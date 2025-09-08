@@ -11,6 +11,7 @@ import { promisePoolEnd } from '@/db';
 import authRoutes from '@/routes/auth';
 import bootstrapRoutes from '@/routes/bootstrap';
 import userRoutes from '@/routes/user';
+import teamRoutes from '@/routes/team';
 
 // Load environment variables
 dotenv.config();
@@ -56,6 +57,7 @@ app.get('/api/status', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/bootstrap', bootstrapRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/team', teamRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: Function) => {
