@@ -25,7 +25,7 @@ export const slugParamSchema = z.object({
 
 // Common validation schemas
 export const emailSchema = z.string().email('Invalid email format');
-export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters long');
+export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters long').max(64, 'Password must be at most 64 characters long');
 export const nameSchema = z.string().min(2, 'Name must be at least 2 characters long').max(50, 'Name must be less than 50 characters');
 
 // UUID validation

@@ -15,7 +15,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     const auth0Id = req.auth0Id!;
 
     // Check if user exists
-    const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
+    const user = await getPublicUserByAuth0Id(req) as PublicUser;
 
     if(!user) {
       return res.status(404).json({
@@ -65,7 +65,7 @@ router.patch('/', requireAuth, validate(patchUserSchema), async (req: Request, r
     await updateUserDetails(updates, user.id);
 
     // Fetch updated user data
-    const updatedUser = await getPublicUserByAuth0Id(req.auth0Id!);
+    const updatedUser = await getPublicUserByAuth0Id(req);
 
     if(!updatedUser) {
       return res.json({

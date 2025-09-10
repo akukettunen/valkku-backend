@@ -1,17 +1,19 @@
+import { ROLES } from "@/schemas/team";
+
 export interface Team {
   id: number;
   name: string;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface TeamUser {
-  userId: number;
-  teamId: number;
-  role: "owner" | "admin" | "coach" | "athlete" | "guardian";
-  createdAt: Date;
-  updatedAt: Date;
+  user_id: number;
+  team_id: number;
+  role: ROLES;
+  created_at: Date;
+  updated_at: Date;
 
-  guardianOfId?: number;
-  futureGuardianOfAuth0Id?: string;
+  guardian_of_id?: number;
+  future_guardian_of_email?: string;
 }

@@ -26,7 +26,7 @@ router.put('/', requireAuth, async (req: Request, res: Response) => {
 
     if (existingUsers.length > 0) {
       // User exists, return user data without password
-      const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
+      const user = await getPublicUserByAuth0Id(req) as PublicUser;
 
       return res.status(200).json({
         success: true,
@@ -38,7 +38,7 @@ router.put('/', requireAuth, async (req: Request, res: Response) => {
       await initializeUser(auth0Id);
 
       // Fetch the created user to return complete data
-      const user = await getPublicUserByAuth0Id(auth0Id) as PublicUser;
+      const user = await getPublicUserByAuth0Id(req) as PublicUser;
 
       return res.status(201).json({
         success: true,

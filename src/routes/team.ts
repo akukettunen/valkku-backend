@@ -7,6 +7,7 @@ import { getUserByAuth0Id } from '@/db/user';
 import { User } from '@/types/user';
 import { getPublicUserByAuth0Id } from '@/utils/userHelper';
 import { authorize } from '@/middleware/auth';
+import { getTeamUsers } from '@/db/team';
 const router: Router = Router();
 
 router.post('/', requireAuth, validate(createTeamSchema), async (req: Request, res: Response) => {
@@ -24,7 +25,7 @@ router.post('/', requireAuth, validate(createTeamSchema), async (req: Request, r
 
   await createTeamUser(createdTeamId, user.id, 'owner');
 
-  const publicUser = await getPublicUserByAuth0Id(req.auth0Id!);
+  const publicUser = await getPublicUserByAuth0Id(req);
 
   return res.status(201).json({
     success: true,
@@ -35,11 +36,20 @@ router.post('/', requireAuth, validate(createTeamSchema), async (req: Request, r
   });
 });
 
-router.get('/:teamId/users', requireAuth, authorize('team-users:read', 'team'), async (req: Request, res: Response) => {
+router.get('/:teamId/users', requireAuth, authorize('membership:read', 'team'), async (req: Request, res: Response) => {
+  if(!req.params['teamId']) {
+    return res.status(400).json({
+      success: false,
+      message: 'Team ID is required'
+    });
+  }
+
+  const users = await getTeamUsers(parseInt(req.params['teamId']));
+
   return res.status(200).json({
     success: true,
     message: 'Team users fetched successfully',
-    data: ['users here']
+    data: users
   });
 });
 
