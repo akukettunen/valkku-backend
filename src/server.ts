@@ -1,15 +1,17 @@
 /// <reference path="./types/express.d.ts" />
 
+import 'express-async-errors';
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { promisePoolEnd } from '@/db';
+import { errorHandler, notFound } from '@/middleware/errors';
+import cookieParser from 'cookie-parser';
 
 // Routes
 import authRoutes from '@/routes/auth';
-import bootstrapRoutes from '@/routes/bootstrap';
 import userRoutes from '@/routes/user';
 import teamRoutes from '@/routes/team';
 
@@ -22,9 +24,16 @@ const PORT = process.env['PORT'] || 8333;
 // Middleware
 app.use(helmet()); // Security headers
 app.use(morgan('combined')); // HTTP request logging
-app.use(cors()); // Enable CORS
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+})); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(cookieParser());
+
+// Trust proxy
+app.set('trust proxy', 1)
 
 // Basic route
 app.get('/', (_req: Request, res: Response) => {
@@ -55,26 +64,11 @@ app.get('/api/status', (_req: Request, res: Response) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
-app.use('/api/bootstrap', bootstrapRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
 
-// Error handling middleware
-app.use((err: Error, _req: Request, res: Response, _next: Function) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Something went wrong!',
-    message: process.env['NODE_ENV'] === 'development' ? err.message : 'Internal server error'
-  });
-});
-
-// 404 handler - catch all unmatched routes
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl
-  });
-});
+app.use(notFound);
+app.use(errorHandler);
 
 // Start server
 const server = app.listen(PORT, () => {

@@ -1,92 +1,59 @@
 import { Router, Request, Response } from 'express';
 import { PublicUser, User } from '@/types/user';
-import { bootstrapUserSchema } from '@/schemas/auth';
 import { validate } from '@/middleware/validation';
 import { patchUserSchema } from '@/schemas/user';
-import { requireAuth } from '@/middleware/auth';
-import { getUserByAuth0Id, updateUserDetails } from '@/db/user';
-import { getPublicUserByAuth0Id } from '@/utils/userHelper';
+import { getUserById, updateUserDetails } from '@/db/user';
+import { getPublicUserById } from '@/utils/userHelper';
+import { AppError } from '@/middleware/errors';
+import { requireSignedIn } from '@/middleware/auth';
 
 const router: Router = Router();
 
-router.get('/', requireAuth, async (req: Request, res: Response) => {
-  try {
-    // Get Auth0 user ID from middleware
-    const auth0Id = req.auth0Id!;
+router.get('/me', requireSignedIn, async (req: Request, res: Response) => {
+  const user = await getPublicUserById(req.user?.id!, null) as PublicUser;
 
-    // Check if user exists
-    const user = await getPublicUserByAuth0Id(req) as PublicUser;
+  if(!user) throw new AppError('User not found', 404, 'something_went_wrong');
 
-    if(!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-      // User exists, return user data without password
-    return res.status(200).json({
-      success: true,
-      message: 'User found',
-      data: user
-    });
-  } catch (error) {
-    console.error('Bootstrap error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error in bootstrap handler'
-    });
-  }
+  return res.status(200).json({
+    success: true,
+    message: 'User found',
+    code: 'user_found',
+    data: user
+  });
 });
 
-router.patch('/', requireAuth, validate(patchUserSchema), async (req: Request, res: Response) => {
+router.patch('/me', requireSignedIn, validate(patchUserSchema), async (req: Request, res: Response) => {
   const { emojiClickedCount, firstName, lastName } = req.body;
-
-  try {
-    const [ user ] = await getUserByAuth0Id(req.auth0Id!) as User[];
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Auto-set pendingDetails to false if firstName and lastName are provided
-    const updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; pendingDetails?: boolean } = {
-      emojiClickedCount,
-      firstName,
-      lastName
-    };
-
-    if (firstName && lastName) {
-      updates.pendingDetails = false;
-    }
-
-    await updateUserDetails(updates, user.id);
-
-    // Fetch updated user data
-    const updatedUser = await getPublicUserByAuth0Id(req);
-
-    if(!updatedUser) {
-      return res.json({
-        success: false,
-        message: 'Updated user not found',
-        data: null
-      })
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'User updated successfully',
-      data: updatedUser
-    });
-  } catch (error) {
-    console.error('Patch error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error in patch /user'
-    });
+  console.log('req.user', req.user);
+  const [ user ] = await getUserById(req.user?.id!) as User[];
+  if (!user) {
+    throw new AppError('User not found', 404, 'user_not_found');
   }
+
+  const updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; pendingDetails?: boolean } = {
+    emojiClickedCount,
+    firstName,
+    lastName
+  };
+
+  if (firstName && lastName) {
+    updates.pendingDetails = false;
+  }
+
+  await updateUserDetails(updates, user.id);
+
+  const updatedUser = await getPublicUserById(req.user?.id!, null) as PublicUser;
+
+  if (!updatedUser) {
+    throw new AppError('Updated user not found', 404, 'user_not_found');
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'User updated successfully',
+    code: 'user_updated_successfully',
+    data: updatedUser
+  });
 });
 
 export default router;

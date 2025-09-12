@@ -1,11 +1,20 @@
 import { query } from '@/db/index';
 import { ROLES } from '@/schemas/team';
 import { UserInTeam } from '@/types/user';
+import { Team } from '@/types/team';
 
 export const createTeam = async (name: string) => {
   return query(`
     INSERT INTO teams (name) VALUES (?)
   `, [name]) as any;
+};
+
+export const getTeamById = async (id: number) => {
+  const result = await query(`
+    SELECT * FROM teams WHERE id = ?
+  `, [id]) as any;
+
+  return result as Team[];
 };
 
 export const createTeamUser = async (teamId: number, userId: number, role: ROLES) => {
@@ -16,7 +25,14 @@ export const createTeamUser = async (teamId: number, userId: number, role: ROLES
 
 export const getTeamUsers = async (teamId: number) => {
   const result = await query(`
-    SELECT team_users.userId, team_users.role, team_users.createdAt as joinedAt, users.firstName, users.lastName FROM team_users
+    SELECT
+      team_users.userId,
+      team_users.role,
+      team_users.createdAt as joinedAt,
+      users.firstName,
+      users.lastName,
+      users.email
+    FROM team_users
     LEFT JOIN users ON team_users.userId = users.id
     WHERE team_users.teamId = ?
   `, [teamId])

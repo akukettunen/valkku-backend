@@ -2,6 +2,15 @@ import { z } from 'zod';
 import { emailSchema, passwordSchema, nameSchema } from './common';
 
 export const signupSchema = z.object({
+  firstName: nameSchema,
+  lastName: nameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  repeatPassword: passwordSchema,
+  preferredLanguage: z.string().min(1, 'Preferred language is required')
+});
+
+export const loginSchema = z.object({
   email: emailSchema,
   password: passwordSchema
 });

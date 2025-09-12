@@ -15,16 +15,21 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "argon2": "^0.44.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
     "express-oauth2-jwt-bearer": "^1.7.1",
     "helmet": "^8.1.0",
+    "jose": "^6.1.0",
     "morgan": "^1.10.1",
     "mysql2": "^3.14.4",
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",

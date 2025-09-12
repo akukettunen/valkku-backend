@@ -1,70 +1,63 @@
-import { auth } from "express-oauth2-jwt-bearer";
 import { Request, Response, NextFunction } from "express";
-import scopes from "@/utils/scopes";
 import dotenv from "dotenv";
-import { TeamUser } from "@/types/team";
-import { getTeamUserByAuth0IdAndTeamId } from "@/db/team";
+import { verifyToken } from "@/utils/tokenHelper"
+import { AppError } from "@/middleware/errors"
+import { TeamUser } from "@/types/team"
+import scopes from "@/utils/scopes"
+import { ROLES } from "@/schemas/team";
 
 dotenv.config();
 
-// Validate required environment variables
-const AUTH0_AUDIENCE = process.env["AUTH0_AUDIENCE"];
-const AUTH0_DOMAIN = process.env["AUTH0_DOMAIN"];
-
-if (!AUTH0_AUDIENCE || !AUTH0_DOMAIN) {
-  throw new Error("Missing required Auth0 environment variables: AUTH0_AUDIENCE and AUTH0_DOMAIN");
-}
-
-const checkJwt = auth({
-  audience: AUTH0_AUDIENCE,
-  issuerBaseURL: `https://${AUTH0_DOMAIN}`,
-  tokenSigningAlg: "RS256",
-});
-
-function attachAuth0User(req: Request, res: Response, next: NextFunction) {
+/**
+ * Middleware that requires a valid access token.
+ * Usage: app.get('/protected', requireSignedIn, handler)
+ */
+export async function requireSignedIn(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const payload = req.auth?.payload;
-
-    if (!payload) {
-      return res.status(401).json({ error: "Missing JWT payload" });
+    const authHeader = req.headers["authorization"]
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new AppError("Missing or invalid Authorization header", 401, "unauthorized")
     }
 
-    const sub = payload.sub;
+    console.log('authHeader', authHeader);
 
-    if (!sub) {
-      return res.status(401).json({ error: "Missing sub in token" });
-    }
+    const token = authHeader.substring("Bearer ".length).trim()
+    const payload = await verifyToken<{ sub: string; role?: string; jti?: string, teams?: TeamUser[] }>(token)
 
-    req.auth0Id = sub;
-
-    next();
-    return;
-  } catch (err) {
-    console.error("Auth middleware error:", err);
-    return res.status(401).json({ error: "Invalid authentication token" });
+    // attach to req for downstream handlers
+    req.user = { id: parseInt(payload.sub), jti: payload.jti ?? '', teams: payload.teams ?? [] };
+    return next()
+  } catch (err: any) {
+    return next(
+      new AppError("Invalid or expired token", 401, "unauthorized")
+    )
   }
 }
 
-// 4. Export a combined middleware
-export const requireAuth = [checkJwt, attachAuth0User];
+// export async function requireScope(scopeString: string, scope: string) {
+//   return (req: Request, res: Response, next: NextFunction) => {
+//     const teamIdStringish = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
+//     const teamId = teamIdStringish ? parseInt(teamIdStringish) : null;
 
-export const authorize = (scopeString: string, scope: 'team' | 'individual') => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    const auth0Id = req.auth0Id;
-    const teamId = req.params['teamId'] || req.body['teamId'];
+//     const user = req.user;
+//     const userTeams = user?.teams;
 
-    const [ teamUser ] = await getTeamUserByAuth0IdAndTeamId(auth0Id!, teamId) as TeamUser[];
+//     const userTeam = userTeams?.find(team => team.teamId === teamId) as TeamUser | undefined;
+//     if (!userTeam) {
+//       throw new AppError('Team not found', 404, 'team_not_found');
+//     }
 
-    if(!teamUser) {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+//     const role = userTeam.role as ROLES;
+//     const allowedRoles = scopes[scope]
 
-    const allowedScopes = scopes[scope][scopeString as keyof typeof scopes[typeof scope]]; // Get the allowed users scoped for this action
-    if(allowedScopes.includes(teamUser.role)) {
-      next();
-      return;
-    } else {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
-  };
-};
+//     if (!allowedRoles.includes(role)) {
+//       throw new AppError('Unauthorized', 403, 'unauthorized');
+//     }
+
+//     return next();
+//   }
+// }

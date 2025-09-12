@@ -1,10 +1,172 @@
 import { Router, Request, Response } from "express";
-import { signupSchema } from "@/schemas/auth";
-
+import { signupSchema, loginSchema } from "@/schemas/auth";
+import { validate } from "@/middleware/validation";
+import { createUser, getUserByEmail, revokeSession } from "@/db/user";
+import { User } from "@/types/user";
+import { getPublicUserById } from "@/utils/userHelper";
 const router: Router = Router();
+import { AppError } from "@/middleware/errors";
+import { hashPassword } from "@/utils/authHelper";
+import { verifyPassword } from "@/utils/authHelper";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/utils/tokenHelper";
+import {
+  findSessionByHash,
+  createSession,
+  linkReplacedSession,   // sets replacedBy for old session
+  revokeSessionChain     // optional: revoke this and descendants on reuse
+} from '@/db/session'
 
-router.post('/signup', async (req: Request, res: Response) => {
+router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
+
+  const [ user ] = await getUserByEmail(email) as User[];
+
+  const candidateHash = user?.passwordHash ?? '$argon2id$v=19$m=65536,t=3,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+  const isPasswordValid = await verifyPassword(candidateHash, password);
+
+  if(!user || !isPasswordValid) {
+    throw new AppError('Password or email is wrong', 401, 'invalid_login_credentials');
+  }
+
+  const publicUser = await getPublicUserById(user.id, null);
+  if(!publicUser) {
+    throw new AppError('Something went wrong', 500, 'something_went_wrong');
+  }
+
+  const accessToken = await generateAccessToken(publicUser)
+  const { token, hash, jti, expiresAt } = await generateRefreshToken()
+
+  await createSession({
+    jti,
+    userId: user.id,
+    refreshHash: hash,
+    expiresAt,
+    ip: req.ip ?? null,
+    userAgent: req.headers['user-agent'] ?? null
+  })
+
+  res.set('Cache-Control', 'no-store')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+
+  res.cookie("rtid", token, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] !== 'development',               // true in prod (HTTPS)
+    sameSite: "lax",
+    path: "/api/auth/refresh",      // critical: only sent to refresh endpoint
+    maxAge: parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 * 1000 // 90 days
+  })
+
+  return res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    code: 'login_successful',
+    data: {
+      token: accessToken,
+      user: publicUser
+    }
+  })
 });
+
+router.post('/signup', validate(signupSchema), async (req: Request, res: Response) => {
+  const { firstName, lastName, email, password, repeatPassword, preferredLanguage } = req.body;
+
+  const [ existingUser ] = await getUserByEmail(email) as User[];
+  if(existingUser) {
+    throw new AppError('User already exists', 400, 'user_already_exists');
+  }
+
+  if(password !== repeatPassword) {
+    throw new AppError('Passwords do not match', 400, 'passwords_do_not_match');
+  }
+
+  const passwordHash = await hashPassword(password);
+  await createUser({ email, passwordHash, firstName, lastName, preferredLanguage }) as any;
+
+  return res.status(201).json({
+    success: true,
+    message: 'Signup successful',
+    code: 'signup_successful'
+  });
+});
+
+router.post('/refresh', async (req, res) => {
+  const cookie = req.cookies?.rtid
+
+  if (!cookie) {
+    throw new AppError('Missing refresh token', 401, 'missing_refresh')
+  }
+
+  const hash = hashRefreshToken(cookie)
+  const session = await findSessionByHash(hash)
+  if (!session) {
+    throw new AppError('Invalid refresh token', 401, 'invalid_refresh')
+  }
+  if (session.revokedAt) {
+    throw new AppError('Refresh token revoked', 401, 'refresh_revoked')
+  }
+  if (session.replacedBy) {
+    // Reuse detected: an old token was presented after rotation
+    await revokeSessionChain(session.userId, session.jti)
+    throw new AppError('Refresh token reuse detected', 401, 'refresh_reuse_detected')
+  }
+  if (new Date(session.expiresAt) < new Date()) {
+    throw new AppError('Refresh token expired', 401, 'refresh_expired')
+  }
+
+  // Rotate
+  const user = await getPublicUserById(session.userId, null)
+  if (!user) throw new AppError('User not found', 404, 'user_not_found')
+
+  const accessToken = await generateAccessToken(user)
+  const { token: newToken, hash: newHash, jti: newJti, expiresAt } = await generateRefreshToken()
+
+  await createSession({
+    jti: newJti,
+    userId: user.id,
+    refreshHash: newHash,
+    expiresAt,
+    ip: req.ip ?? null,
+    userAgent: req.headers['user-agent'] ?? null
+  })
+
+  await linkReplacedSession(session.jti, newJti)
+
+  // Set rotated cookie
+  res.cookie('rtid', newToken, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] !== 'development',
+    sameSite: 'lax',           // use 'none' + secure:true if cross-site
+    path: '/api/auth/refresh',
+    maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
+  })
+
+  res.set('Cache-Control', 'no-store')
+  res.json({ token: accessToken })
+})
+
+router.post("/logout", async (req: Request, res: Response) => {
+  const cookie = req.cookies['rtid']
+
+  if (cookie) {
+    const hash = hashRefreshToken(cookie)
+    const session = await findSessionByHash(hash)
+    if (session && !session.revokedAt) {
+      await revokeSession(session.jti) // mark session revoked
+    }
+  }
+
+  // Clear the refresh cookie
+  res.clearCookie("rtid", {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] !== "development",
+    sameSite: "lax",
+    path: "/api/auth/refresh" // 👈 must match the Path you used when setting
+  })
+
+  res.set("Cache-Control", "no-store")
+  return res.status(204).end()
+})
+
 
 export default router;

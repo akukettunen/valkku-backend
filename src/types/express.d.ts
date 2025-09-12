@@ -1,7 +1,11 @@
 declare global {
   namespace Express {
     interface Request {
-      auth0Id?: string | undefined;
+      user?: {
+        id: number,
+        teams: TeamUser[],
+        jti: string,
+      }
     }
   }
 }

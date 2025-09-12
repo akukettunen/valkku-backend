@@ -1,31 +1,30 @@
-import { getUserByAuth0Id, getUserTeams } from "@/db/user";
+import { getUserTeams, getUserById } from "@/db/user";
 import { User, PublicUser } from "@/types/user"
-import { Team } from "@/types/team";
-import { Request } from "express";
+import { TeamUser } from "@/types/team";
 
-// When ever user is returned by this API, we should use this function to get the public user
-export async function getPublicUserByAuth0Id(req: Request) {
-  const auth0Id = req.auth0Id!;
-  const currentTeamIdString = req.headers['x-current-team-id'] as string | undefined;
-  const currentTeamId = currentTeamIdString ? parseInt(currentTeamIdString) : undefined;
+export async function getPublicUserById(id: number, currentTeamId: number | null) {
+  const [ user ] = await getUserById(id) as User[];
 
-  const users = await getUserByAuth0Id(auth0Id) as User[];
-
-  if(users.length === 0) {
+  if(!user) {
     return null;
   }
 
-  const user = users[0] as User;
-
-  const teams = await getUserTeams(user.id) as Team[];
+  const teams = await getUserTeams(user.id) as TeamUser[];
 
   let newCurrentTeamId;
   if(!teams.length) newCurrentTeamId = null;
-  else if(!!teams.find(team => team.id === currentTeamId)) newCurrentTeamId = currentTeamId!;
-  else newCurrentTeamId = teams[0]!.id || null;
+  else if(!!teams.find(team => team.teamId === currentTeamId)) newCurrentTeamId = currentTeamId!;
+  else newCurrentTeamId = teams[0]!.teamId || null;
 
   const publicUser: PublicUser = {
-    ...user,
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    pendingDetails: user.pendingDetails,
+    emojiClickedCount: user.emojiClickedCount,
+    preferredLanguage: user.preferredLanguage,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     teams,
     currentTeamId: newCurrentTeamId
   };

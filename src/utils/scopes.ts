@@ -16,20 +16,20 @@ Individual:
 export default {
   "team": { // actions regarding the team
     "team:delete": ["owner"],
-    "team:read":  ["owner","admin", "member"],
+    "team:read":  ["owner","admin", "athlete"],
     "team:update": ["owner", "admin"],
     "team:invite": ["owner", "admin"],
-    "team:leave": ["owner", "admin", "member", "guardian"],
+    "team:leave": ["owner", "admin", "athlete", "guardian"],
     "membership:remove": ["owner", "admin"], // owner membership cannot be removed
     "membership:read": ["owner", "admin", "coach"],
     "team:transfer_ownership": ["owner"],
     "event:create": ["owner", "admin", "coach"],
   },
   "individual": { // actions regarding ones own stuff
-    "event:create": [ "self", "guardian"], // create event for self or guarded athlete
-    "event:read": [ "self", "guardian"],
-    "event:update": [ "self", "guardian"],
-    "event:remove": [ "self", "guardian"],
-    "membership:remove": ["self"],
+    "event:create": [ "athlete", "guardian"], // create event for self or guarded athlete
+    "event:read": [ "athlete", "guardian"],
+    "event:update": [ "athlete", "guardian"],
+    "event:remove": [ "athlete", "guardian"],
+    "membership:remove": ["athlete"],
   }
 }

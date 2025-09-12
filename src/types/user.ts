@@ -1,4 +1,5 @@
-import { Team } from "./team";
+import { Team, TeamUser } from "./team";
+import { ROLES } from "@/schemas/team";
 
 export interface User {
   id: number;
@@ -10,6 +11,7 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   emojiClickedCount: number;
+  preferredLanguage: 'fi' | 'en';
 }
 
 export interface PublicUser {
@@ -19,7 +21,22 @@ export interface PublicUser {
   pendingDetails: boolean;
   emojiClickedCount: number;
   currentTeamId: number | null;
-  teams: Team[];
+  teams: TeamUser[];
+  preferredLanguage: 'fi' | 'en';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MinimalTeamUser {
+  role: ROLES,
+  teamId: number,
+  guardianOfId?: number,
+}
+
+export interface TokenUser {
+  sub: string,
+  teams: MinimalTeamUser[],
+  jti: string,
 }
 
 export interface UserInTeam {
