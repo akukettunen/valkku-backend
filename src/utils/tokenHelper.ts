@@ -7,7 +7,7 @@ import { MinimalTeamUser } from "@/types/user"
 // --- config ---
 const ISS = process.env["JWT_ISSUER"]!
 const AUD = process.env["JWT_AUDIENCE"]!
-const ACCESS_TTL_SEC = 10 * 60 // 10 min
+const ACCESS_TTL_SEC = 15 * 60 // 15 min
 const REFRESH_TTL_SEC = parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 // 90 days
 
 // HS256 secret (switch to EdDSA/RS256 for prod if you can)
@@ -16,6 +16,7 @@ const ENC_KEY = new TextEncoder().encode(JWT_SECRET)
 
 // Optional app-wide pepper for refresh tokens
 const REFRESH_PEPPER = process.env["REFRESH_PEPPER"] ?? ""
+const INVITE_TOKEN_PEPPER = process.env["INVITE_TOKEN_PEPPER"] ?? ""
 
 // ---- helpers ----
 function nowSeconds() {
@@ -29,9 +30,8 @@ export async function generateAccessToken(user: PublicUser): Promise<string> {
   const tokenUser: TokenUser = {
     sub: user.id.toString(),
     teams: user.teams.map(team => ({
-      role: team.role,
-      teamId: team.teamId,
-      guardianOfId: team.guardianOfId
+      roles: team.roles.map(role => ({ role: role.role, guardianOfId: role.guardianOf })),
+      teamId: team.teamId
     })) as MinimalTeamUser[],
     jti
   }
@@ -80,6 +80,10 @@ export async function verifyToken<T extends { sub: string; jti?: string; role?: 
 /** Hash a refresh token (with pepper) for DB storage/compare. */
 export function hashRefreshToken(token: string): string {
   return crypto.createHash("sha256").update(token + REFRESH_PEPPER, "utf8").digest("base64url")
+}
+
+export function hashInviteToken(token: string): string {
+  return crypto.createHash("sha256").update(token + INVITE_TOKEN_PEPPER, "utf8").digest("base64url")
 }
 
 /** Constant-time check of a presented refresh token against stored hash. */

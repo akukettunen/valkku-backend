@@ -2,7 +2,7 @@ import { query } from '@/db/index'
 
 type Session = {
   jti: string
-  userId: number
+  userId: string
   refreshHash: string
   createdAt: Date
   expiresAt: Date
@@ -15,7 +15,7 @@ type Session = {
 
 type NewSession = {
   jti: string
-  userId: number | string
+  userId: string
   refreshHash: string
   expiresAt: Date
   ip?: string | null
@@ -60,7 +60,7 @@ export const findSessionByJti = async (jti: string): Promise<Session | null> => 
 // ---- updates ----
 export const linkReplacedSession = async (oldJti: string, newJti: string) => {
   return await query(
-    `UPDATE sessions SET replacedBy = ?, revokedAt = NOW(3) WHERE jti = ?`,
+    `UPDATE sessions SET replacedBy = ? WHERE jti = ?`,
     [newJti, oldJti]
   )
 }
@@ -72,7 +72,7 @@ export const revokeSession = async (jti: string) => {
   )
 }
 
-export const revokeSessionChain = async (userId: number | string, rootJti: string) => {
+export const revokeSessionChain = async (userId: string, rootJti: string) => {
   // simple version: revoke this user’s session + descendants (if you want chain handling)
   return await query(
     `UPDATE sessions SET revokedAt = NOW(3) WHERE userId = ? AND (jti = ? OR replacedBy = ?)`,

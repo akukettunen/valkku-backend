@@ -12,9 +12,9 @@ import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/u
 import {
   findSessionByHash,
   createSession,
-  linkReplacedSession,   // sets replacedBy for old session
-  revokeSessionChain     // optional: revoke this and descendants on reuse
+  linkReplacedSession
 } from '@/db/session'
+import { createId } from '@/utils/userHelper';
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -81,7 +81,7 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
   }
 
   const passwordHash = await hashPassword(password);
-  await createUser({ email, passwordHash, firstName, lastName, preferredLanguage }) as any;
+  await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage }) as any;
 
   return res.status(201).json({
     success: true,
@@ -99,16 +99,12 @@ router.post('/refresh', async (req, res) => {
 
   const hash = hashRefreshToken(cookie)
   const session = await findSessionByHash(hash)
+
   if (!session) {
     throw new AppError('Invalid refresh token', 401, 'invalid_refresh')
   }
   if (session.revokedAt) {
     throw new AppError('Refresh token revoked', 401, 'refresh_revoked')
-  }
-  if (session.replacedBy) {
-    // Reuse detected: an old token was presented after rotation
-    await revokeSessionChain(session.userId, session.jti)
-    throw new AppError('Refresh token reuse detected', 401, 'refresh_reuse_detected')
   }
   if (new Date(session.expiresAt) < new Date()) {
     throw new AppError('Refresh token expired', 401, 'refresh_expired')
@@ -147,14 +143,6 @@ router.post('/refresh', async (req, res) => {
 
 router.post("/logout", async (req: Request, res: Response) => {
   const cookie = req.cookies['rtid']
-
-  if (cookie) {
-    const hash = hashRefreshToken(cookie)
-    const session = await findSessionByHash(hash)
-    if (session && !session.revokedAt) {
-      await revokeSession(session.jti) // mark session revoked
-    }
-  }
 
   // Clear the refresh cookie
   res.clearCookie("rtid", {

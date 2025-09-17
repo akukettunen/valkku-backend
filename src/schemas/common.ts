@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const roleSchema = z.enum(['owner', 'admin', 'coach', 'athlete', 'guardian']);
+export const normalRoleSchema = z.enum(['admin', 'coach', 'athlete', 'guardian']);
+export const preferredLanguageSchema = z.enum(['fi', 'en']);
+
 // Common query parameter schemas
 export const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/, 'Page must be a number').optional().transform(val => val ? parseInt(val) : 1),

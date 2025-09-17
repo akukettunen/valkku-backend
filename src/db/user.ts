@@ -1,6 +1,7 @@
 import { query } from '@/db/index';
-import { TeamUser } from '@/types/team';
-import { User } from '@/types/user';
+import { TeamUser, TeamUserRole } from '@/types/team';
+import { PREFERRED_LANGUAGE, User } from '@/types/user';
+import { AppError } from '@/middleware/errors';
 
 export const putUserDetails = async (user: { firstName: string; lastName: string }) => {
   const { firstName, lastName } = user;
@@ -10,13 +11,14 @@ export const putUserDetails = async (user: { firstName: string; lastName: string
   return result;
 };
 
-export const getUserById = async (id: number) => {
+export const getUserById = async (id: string) => {
+  if(id.length !== 12) {
+    throw new AppError('Invalid user id', 400, 'invalid_user_id');
+    return null;
+  }
+
   const result = await query('SELECT * FROM users WHERE id = ?', [id]);
   return result;
-};
-
-export const getUserByAuth0Id = async (auth0Id: string) => {
-  return query('SELECT * FROM users WHERE auth0Id = ?', [auth0Id]);
 };
 
 export const initializeUser = async (auth0Id: string) => {
@@ -27,14 +29,14 @@ export const initializeUser = async (auth0Id: string) => {
   return result;
 };
 
-export const updateUser = async (emojiClickedCount: number, id: number) => {
+export const updateUser = async (emojiClickedCount: number, id: string) => {
   const result = await query(`
     UPDATE users SET emojiClickedCount = ? WHERE id = ?
   `, [emojiClickedCount, id]);
   return result;
 };
 
-export const updateUserDetails = async (updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; pendingDetails?: boolean }, id: number) => {
+export const updateUserDetails = async (updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; preferredLanguage?: PREFERRED_LANGUAGE }, id: string) => {
   const fields = [];
   const values = [];
 
@@ -50,9 +52,9 @@ export const updateUserDetails = async (updates: { emojiClickedCount?: number; f
     fields.push('lastName = ?');
     values.push(updates.lastName);
   }
-  if (updates.pendingDetails !== undefined) {
-    fields.push('pendingDetails = ?');
-    values.push(updates.pendingDetails);
+  if (updates.preferredLanguage !== undefined) {
+    fields.push('preferredLanguage = ?');
+    values.push(updates.preferredLanguage);
   }
 
   values.push(id);
@@ -63,14 +65,13 @@ export const updateUserDetails = async (updates: { emojiClickedCount?: number; f
   return result;
 };
 
-export const getUserTeams = async (userId: number) => {
+export const getUserTeams = async (userId: string) => {
   const result = await query(`
     SELECT
       team_users.userId,
       team_users.teamId,
       teams.name as teamName,
-      team_users.role,
-      team_users.createdAt as joinedAt
+      team_users.createdAt
     FROM team_users
     LEFT JOIN teams ON team_users.teamId = teams.id
     WHERE team_users.userId = ?;
@@ -78,12 +79,19 @@ export const getUserTeams = async (userId: number) => {
   return result as TeamUser[];
 };
 
-export const createUser = async (user: { email: string; passwordHash: string; firstName: string; lastName: string; preferredLanguage: 'fi' | 'en' }) => {
-  const { email, passwordHash, firstName, lastName, preferredLanguage } = user;
+export const getUserTeamRoles = async (userId: string) => {
+  const result = await query(`
+    SELECT userId, teamId, role, guardianOf, createdAt, updatedAt FROM team_user_roles WHERE userId = ?
+  `, [userId])
+  return result as TeamUserRole[];
+}
+
+export const createUser = async (user: { id: string; email: string; passwordHash: string | null; firstName: string; lastName: string; preferredLanguage: 'fi' | 'en' }) => {
+  const { id, email, passwordHash, firstName, lastName, preferredLanguage } = user;
 
   const result = await query(`
-    INSERT INTO users (email, passwordHash, firstName, lastName, preferredLanguage) VALUES (?, ?, ?, ?, ?)
-  `, [email, passwordHash, firstName, lastName, preferredLanguage]);
+    INSERT INTO users (id, email, passwordHash, firstName, lastName, preferredLanguage) VALUES (?, ?, ?, ?, ?, ?)
+  `, [id, email, passwordHash, firstName, lastName, preferredLanguage]);
   return result;
 };
 

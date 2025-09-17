@@ -1,20 +1,41 @@
-import { getUserTeams, getUserById } from "@/db/user";
+import { getUserTeams, getUserById, getUserTeamRoles } from "@/db/user";
 import { User, PublicUser } from "@/types/user"
-import { TeamUser } from "@/types/team";
+import { TeamUser, TeamUserRole, PublicTeamUser } from "@/types/team";
+import { customAlphabet } from 'nanoid';
 
-export async function getPublicUserById(id: number, currentTeamId: number | null) {
+export function createId(): string {
+  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  const nanoid = customAlphabet(alphabet, 12);
+
+  return nanoid();
+}
+
+export async function getPublicUserById(id: string, currentTeamId: string | null) {
   const [ user ] = await getUserById(id) as User[];
 
   if(!user) {
     return null;
   }
 
+  console.log("Get public user by id", user.email)
+
   const teams = await getUserTeams(user.id) as TeamUser[];
+  const allTeamRoles = await getUserTeamRoles(user.id) as TeamUserRole[];
+
+  console.log("teams length", teams.length)
+
+  const publicTeams = teams.map(team => {
+    const roles = allTeamRoles.filter(role => role.teamId === team.teamId);
+    return {
+      ...team,
+      roles
+    };
+  }) as PublicTeamUser[];
 
   let newCurrentTeamId;
-  if(!teams.length) newCurrentTeamId = null;
-  else if(!!teams.find(team => team.teamId === currentTeamId)) newCurrentTeamId = currentTeamId!;
-  else newCurrentTeamId = teams[0]!.teamId || null;
+  if(!publicTeams.length) newCurrentTeamId = null;
+  else if(!!publicTeams.find(team => team.teamId === currentTeamId)) newCurrentTeamId = currentTeamId!;
+  else newCurrentTeamId = publicTeams[0]!.teamId || null;
 
   const publicUser: PublicUser = {
     id: user.id,
@@ -25,7 +46,7 @@ export async function getPublicUserById(id: number, currentTeamId: number | null
     preferredLanguage: user.preferredLanguage,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    teams,
+    teams: publicTeams,
     currentTeamId: newCurrentTeamId
   };
 

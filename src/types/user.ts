@@ -1,8 +1,10 @@
-import { Team, TeamUser } from "./team";
+import { PublicTeamUser } from "./team";
 import { ROLES } from "@/schemas/team";
 
+export type PREFERRED_LANGUAGE = 'fi' | 'en';
+
 export interface User {
-  id: number;
+  id: string;
   email: string;
   passwordHash: string;
   firstName?: string | undefined;
@@ -11,26 +13,20 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   emojiClickedCount: number;
-  preferredLanguage: 'fi' | 'en';
+  preferredLanguage: PREFERRED_LANGUAGE;
 }
 
 export interface PublicUser {
-  id: number;
+  id: string;
   firstName?: string | undefined;
   lastName?: string | undefined;
   pendingDetails: boolean;
   emojiClickedCount: number;
-  currentTeamId: number | null;
-  teams: TeamUser[];
-  preferredLanguage: 'fi' | 'en';
+  currentTeamId: string | null;
+  teams: PublicTeamUser[];
+  preferredLanguage: PREFERRED_LANGUAGE;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface MinimalTeamUser {
-  role: ROLES,
-  teamId: number,
-  guardianOfId?: number,
 }
 
 export interface TokenUser {
@@ -39,11 +35,22 @@ export interface TokenUser {
   jti: string,
 }
 
+export interface MinimalTeamUser {
+  roles: MinimalTeamUserRole[],
+  teamId: string,
+  guardianOfId?: string,
+}
+
+export interface MinimalTeamUserRole {
+  role: ROLES,
+  guardianOfId?: string,
+}
+
 export interface UserInTeam {
-  id: number; // userId
+  userId: string;
   firstName?: string | undefined;
   lastName?: string | undefined;
-  joinedAt: Date;
-  teamId: number;
-  role: "owner" | "admin" | "coach" | "athlete" | "guardian";
+  createdAt: Date;
+  teamId: string;
+  role: ROLES;
 }

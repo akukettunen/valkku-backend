@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import { verifyToken } from "@/utils/tokenHelper"
 import { AppError } from "@/middleware/errors"
-import { TeamUser } from "@/types/team"
+import { PublicTeamUser, TeamUser, TeamUserRole } from "@/types/team"
 import scopes from "@/utils/scopes"
 import { ROLES } from "@/schemas/team";
+import { TokenUser } from "@/types/user";
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ dotenv.config();
  */
 export async function requireSignedIn(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) {
   try {
@@ -23,13 +24,11 @@ export async function requireSignedIn(
       throw new AppError("Missing or invalid Authorization header", 401, "unauthorized")
     }
 
-    console.log('authHeader', authHeader);
-
     const token = authHeader.substring("Bearer ".length).trim()
-    const payload = await verifyToken<{ sub: string; role?: string; jti?: string, teams?: TeamUser[] }>(token)
+    const payload = await verifyToken<TokenUser>(token)
 
     // attach to req for downstream handlers
-    req.user = { id: parseInt(payload.sub), jti: payload.jti ?? '', teams: payload.teams ?? [] };
+    req.user = payload;
     return next()
   } catch (err: any) {
     return next(
@@ -38,26 +37,34 @@ export async function requireSignedIn(
   }
 }
 
-// export async function requireScope(scopeString: string, scope: string) {
-//   return (req: Request, res: Response, next: NextFunction) => {
-//     const teamIdStringish = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
-//     const teamId = teamIdStringish ? parseInt(teamIdStringish) : null;
+export function requireScope(scopeString: string, scope: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const teamId = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
 
-//     const user = req.user;
-//     const userTeams = user?.teams;
+    const user = req.user;
+    const userTeams = user?.teams;
 
-//     const userTeam = userTeams?.find(team => team.teamId === teamId) as TeamUser | undefined;
-//     if (!userTeam) {
-//       throw new AppError('Team not found', 404, 'team_not_found');
-//     }
+    const userTeam = userTeams?.find(team => team.teamId === teamId) as PublicTeamUser | undefined;
 
-//     const role = userTeam.role as ROLES;
-//     const allowedRoles = scopes[scope]
+    if (!userTeam) {
+      throw new AppError('Team not found', 404, 'team_not_found');
+    }
 
-//     if (!allowedRoles.includes(role)) {
-//       throw new AppError('Unauthorized', 403, 'unauthorized');
-//     }
+    const roles = userTeam.roles as TeamUserRole[];
+    const allowedRoles = scopes[scope as keyof typeof scopes][scopeString as keyof (typeof scopes)[keyof typeof scopes]] as readonly ROLES[];
 
-//     return next();
-//   }
-// }
+    let allowed = false;
+    for (const role of roles) {
+      if (allowedRoles.includes(role.role)) {
+        allowed = true;
+        break;
+      }
+    }
+
+    if (!allowed) {
+      throw new AppError('Unauthorized', 403, 'unauthorized');
+    }
+
+    return next();
+  }
+}

@@ -20,8 +20,9 @@ export default {
     "team:update": ["owner", "admin"],
     "team:invite": ["owner", "admin"],
     "team:leave": ["owner", "admin", "athlete", "guardian"],
-    "membership:remove": ["owner", "admin"], // owner membership cannot be removed
+    "membership:delete": ["owner", "admin"], // owner membership cannot be removed
     "membership:read": ["owner", "admin", "coach"],
+    "membership:create": ["owner", "admin"],
     "team:transfer_ownership": ["owner"],
     "event:create": ["owner", "admin", "coach"],
   },
@@ -29,7 +30,7 @@ export default {
     "event:create": [ "athlete", "guardian"], // create event for self or guarded athlete
     "event:read": [ "athlete", "guardian"],
     "event:update": [ "athlete", "guardian"],
-    "event:remove": [ "athlete", "guardian"],
-    "membership:remove": ["athlete"],
+    "event:delete": [ "athlete", "guardian"],
+    "membership:delete": ["athlete"],
   }
-}
+} as const;
