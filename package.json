@@ -16,6 +16,10 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": "22.x",
+    "npm": "10.x"
+  },
   "dependencies": {
     "argon2": "^0.44.0",
     "cookie-parser": "^1.4.7",
