@@ -22,10 +22,44 @@ const app: Express = express();
 // Middleware
 app.use(helmet()); // Security headers
 app.use(morgan('combined')); // HTTP request logging
-app.use(cors({
-  origin: 'http://localhost:3000',
+// CORS (environment-aware)
+const NODE_ENV = process.env['NODE_ENV'] || 'development';
+const envOrigins = (process.env['CORS_ORIGINS'] || process.env['CORS_ORIGIN'] || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const defaultOriginsByEnv: Record<string, string[]> = {
+  development: [
+    'http://localhost:3000',
+  ],
+  staging: [
+    'https://dev.d1k20vvxxmhyxj.amplifyapp.com',
+    'https://dev.d1k20vvxxmhyxj.amplifyapp.com',
+  ],
+  production: [
+    'https://app.valkku.ai',
+    'https://valkku.ai',
+    'https://www.valkku.ai',
+    'https://www.valkku.com',
+    'https://valkku.com',
+  ]
+};
+
+const allowedOrigins = Array.from(new Set([...(defaultOriginsByEnv[NODE_ENV] || []), ...envOrigins]));
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl, tests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
-})); // Enable CORS
+};
+
+app.use(cors(corsOptions)); // Enable CORS
+app.options('*', cors(corsOptions));
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use(cookieParser());
