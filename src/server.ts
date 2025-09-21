@@ -5,10 +5,10 @@ import app from './app';
 // Load environment variables
 dotenv.config({ quiet: true });
 
-const port = process.env['PORT'] || 3000;
+const port = parseInt(process.env['PORT'] || '3000', 10);
 
 // Start server
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`📱 Environment: ${process.env['NODE_ENV'] || 'development'}`);
   console.log(`🌐 Health check: http://localhost:${port}/health`);

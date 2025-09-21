@@ -38,11 +38,12 @@ const defaultOriginsByEnv: Record<string, string[]> = {
     'https://dev.d1k20vvxxmhyxj.amplifyapp.com',
   ],
   production: [
-    'https://app.valkku.ai',
     'https://valkku.ai',
+    'https://app.valkku.ai',
     'https://www.valkku.ai',
-    'https://www.valkku.com',
     'https://valkku.com',
+    'https://app.valkku.com',
+    'https://www.valkku.com',
   ]
 };
 

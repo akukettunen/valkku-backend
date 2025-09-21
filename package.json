@@ -10,7 +10,8 @@
     "clean": "rm -rf dist",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "heroku-postbuild": "npm run build"
   },
   "author": "",
   "license": "ISC",
