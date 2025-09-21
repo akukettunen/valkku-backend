@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import argon2 from "argon2"
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Create hash
 export async function hashPassword(plain: string) {

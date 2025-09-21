@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
-import { signupSchema, loginSchema } from "@/schemas/auth";
+import { signupSchema, loginSchema, changePasswordSchema } from "@/schemas/auth";
 import { validate } from "@/middleware/validation";
-import { createUser, getUserByEmail, revokeSession } from "@/db/user";
+import { createUser, getUserByEmail, getUserById, revokeSession, updateUserPassword } from "@/db/user";
 import { User } from "@/types/user";
 import { getPublicUserById } from "@/utils/userHelper";
 const router: Router = Router();
@@ -9,6 +9,7 @@ import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
 import { verifyPassword } from "@/utils/authHelper";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/utils/tokenHelper";
+import { requireSignedIn } from "@/middleware/auth";
 import {
   findSessionByHash,
   createSession,
@@ -17,7 +18,7 @@ import {
 import { createId } from '@/utils/userHelper';
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, inviteToken } = req.body;
 
   const [ user ] = await getUserByEmail(email) as User[];
 
@@ -81,7 +82,7 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
   }
 
   const passwordHash = await hashPassword(password);
-  await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage }) as any;
+  await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange: false }) as any;
 
   return res.status(201).json({
     success: true,
@@ -139,7 +140,7 @@ router.post('/refresh', async (req, res) => {
 
   res.set('Cache-Control', 'no-store')
   res.json({ token: accessToken })
-})
+});
 
 router.post("/logout", async (req: Request, res: Response) => {
   const cookie = req.cookies['rtid']
@@ -154,7 +155,39 @@ router.post("/logout", async (req: Request, res: Response) => {
 
   res.set("Cache-Control", "no-store")
   return res.status(204).end()
-})
+});
 
+router.post("/change-password", requireSignedIn, validate(changePasswordSchema), async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user?.sub;
+
+  if (!userId) {
+    throw new AppError('User not authenticated', 401, 'unauthorized');
+  }
+
+  // Get the current user to verify current password
+  const [user] = await getUserById(userId) as User[];
+  if (!user) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+
+  // Verify current password
+  const isCurrentPasswordValid = await verifyPassword(user.passwordHash, currentPassword);
+  if (!isCurrentPasswordValid) {
+    throw new AppError('Current password is incorrect', 400, 'invalid_current_password');
+  }
+
+  // Hash the new password
+  const newPasswordHash = await hashPassword(newPassword);
+
+  // Update the user's password
+  await updateUserPassword(userId, newPasswordHash);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Password changed successfully',
+    code: 'password_changed_successfully'
+  });
+});
 
 export default router;

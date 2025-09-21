@@ -9,25 +9,34 @@ export const createTeamSchema = z.object({
   name: nameSchema
 });
 
-export const guardianSchema = z.object({
+const guardianSchema = z.object({
+  email: emailSchema.optional(),
   userId: z.string().optional(),
-  firstName: nameSchema.optional(),
-  lastName: nameSchema.optional(),
-  preferredLanguage: preferredLanguageSchema.optional(),
-  email: emailSchema.optional()
-}).refine(data => data.userId || (data.firstName && data.lastName && data.email && data.preferredLanguage), {
-  message: "Either userId or all other fields must be provided",
-  path: []
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  preferredLanguage: preferredLanguageSchema
+})
+.refine(data => {
+  return data.email || data.userId;
+}, {
+  message: "Either email or userId must be provided.",
+  path: ['email', 'userId']
 });
 
 export const inviteUserSchema = z.object({
-  firstName: nameSchema,
-  lastName: nameSchema,
   email: emailSchema,
   preferredLanguage: preferredLanguageSchema,
   role: normalRoleSchema,
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   guardianOf: z.string().optional(),
-  guardians: z.array(guardianSchema).max(5).optional()
+  guardians: z.array(guardianSchema).max(6).optional()
+})
+.refine(data => {
+  return data.role !== 'guardian' || data.guardianOf
+}, {
+  message: "Guardian email or userId cannot be the same as the email.",
+  path: ['guardians']
 })
 .refine(data => !data.guardians || data.role === 'athlete', {
   message: "If guardians are provided, role must be 'athlete'.",
@@ -39,11 +48,9 @@ export const inviteUserSchema = z.object({
 })
 .refine(data => {
   if (!data.guardians) return true;
-  const emails = data.guardians.map(g => g.email).filter(Boolean);
-  const userIds = data.guardians.map(g => g.userId).filter(Boolean);
+  const emails = data.guardians.map(g => g).filter(Boolean);
   const uniqueEmails = new Set(emails);
-  const uniqueUserIds = new Set(userIds);
-  return uniqueEmails.size === emails.length && uniqueUserIds.size === userIds.length;
+  return uniqueEmails.size === emails.length;
 }, {
   message: "All guardian emails or userIds must be unique.",
   path: ['guardians']

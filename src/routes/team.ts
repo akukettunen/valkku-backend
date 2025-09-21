@@ -1,18 +1,20 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { validate } from '@/middleware/validation';
-import { createTeamSchema } from '@/schemas/team';
-import { createTeam, createTeamUser, createTeamUserRole, getInviteWithRole, getTeamById, getTeamTeamUserRoles, getInviteByTokenHash } from '@/db/team';
+import { createTeamSchema, NORMAL_ROLES } from '@/schemas/team';
+import { createTeam, createTeamUser, createTeamUserRole, getTeamById, getTeamTeamUserRoles } from '@/db/team';
 import { getUserById, getUserByEmail, createUser } from '@/db/user';
-import { PublicUser, User } from '@/types/user';
-import { getTeamUsers, getTeamUser, getInvitesByTeamId, deleteInvite, getTeamUserRole } from '@/db/team';
+import { PREFERRED_LANGUAGE, PublicUser, User, UserInTeam } from '@/types/user';
+import { getTeamUsers, getTeamUser, getTeamUserRole } from '@/db/team';
 import { getPublicUserById } from '@/utils/userHelper';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { inviteUserSchema } from '@/schemas/team';
 import { AppError } from '@/middleware/errors';
 import { hashInviteToken } from '@/utils/tokenHelper';
 import { generateAccessToken } from '@/utils/tokenHelper';
-import { inviteUser } from '@/utils/inviteHelper';
+import { inviteUserToTeam, userCanBeInvited } from '@/utils/teamHelper';
 import { createId } from '@/utils/userHelper';
+import { TeamUserRole } from '@/types/team';
 
 const router: Router = Router();
 
@@ -23,11 +25,6 @@ router.post('/', requireSignedIn, validate(createTeamSchema), async (req: Reques
   await createTeam({ id: newTeamId, name });
   const [ user ] = await getUserById(req.user?.sub!) as User[];
   const [ team ] = await getTeamById(newTeamId);
-
-  console.log("team", team)
-  console.log("user", user)
-  console.log("team", team!.id)
-  console.log(newTeamId)
 
   if(!user) {
     return res.status(404).json({
@@ -49,7 +46,13 @@ router.post('/', requireSignedIn, validate(createTeamSchema), async (req: Reques
     data: {
       user: publicUser,
       token: accessToken,
-      team
+      team: {
+        ...team,
+        roles: [{
+          role: 'owner',
+          guardianOf: null
+        }]
+      }
     }
   });
 });
@@ -68,10 +71,10 @@ router.get('/:teamId/users', requireSignedIn, requireScope('membership:read', 't
   const users = await getTeamUsers(teamId);
   const roles = await getTeamTeamUserRoles(teamId);
 
-  const publicUsers = users.map((user) => {
+  let publicUsers: UserInTeam[] = users.map((user) => {
     return {
       ...user,
-      roles: roles.filter((role) => role.userId === user.userId)
+      roles: roles.filter((role) => role.userId === user.userId),
     }
   });
 
@@ -83,147 +86,207 @@ router.get('/:teamId/users', requireSignedIn, requireScope('membership:read', 't
   });
 });
 
-router.get('/:teamId/invites', requireSignedIn, requireScope('membership:read', 'team'), async (req: Request, res: Response) => {
-  const { teamId } = req.params;
-
-  const invites = await getInvitesByTeamId(teamId!);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Invites fetched successfully',
-    code: 'invites_fetched_successfully',
-    data: invites
-  });
+// Add a role for an existing team user
+const addTeamUserRoleSchema = z.object({
+  role: z.enum(['admin', 'coach', 'athlete', 'guardian'], { error: 'Role is required' }),
+  guardianOf: z.string().optional()
+}).refine((data) => (data.role === 'guardian' ? !!data.guardianOf : !data.guardianOf), {
+  message: "If role is 'guardian', guardianOf is required; otherwise it must be omitted",
+  path: ['guardianOf']
 });
+
+router.post(
+  '/:teamId/user/:userId/role',
+  requireSignedIn,
+  requireScope('membership:create', 'team'),
+  validate(addTeamUserRoleSchema),
+  async (req: Request, res: Response) => {
+    const { teamId, userId } = req.params;
+    const { role, guardianOf } = req.body as { role: 'admin' | 'coach' | 'athlete' | 'guardian'; guardianOf?: string };
+
+    if (!teamId || !userId) {
+      throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+    }
+
+    // Team must exist
+    const [team] = await getTeamById(teamId);
+    if (!team) {
+      throw new AppError('Team not found', 404, 'something_went_wrong');
+    }
+
+    // User must exist
+    const [user] = await getUserById(userId) as User[];
+    if (!user) {
+      throw new AppError('User not found', 404, 'user_not_found');
+    }
+
+    // Ensure user is in team; if not, add them
+    const [teamUser] = await getTeamUser(teamId, userId);
+    if (!teamUser) {
+      await createTeamUser(teamId, userId);
+    }
+
+    // Validate guardianOf target when role is guardian
+    if (role === 'guardian') {
+      if (guardianOf === userId) {
+        throw new AppError('User cannot be guardian of themselves', 400, 'invalid_guardian_relationship');
+      }
+      const [ guarded ] = await getTeamUser(teamId, guardianOf!);
+      if (!guarded) {
+        throw new AppError('Guardian target not in team', 400, 'guardian_target_not_in_team');
+      }
+      const existingGuardianRoles = await getTeamUserRole(teamId, userId);
+      const hasGuardianForTarget = existingGuardianRoles.some(r => r.role === 'guardian' && r.guardianOf === guardianOf);
+      if (hasGuardianForTarget) {
+        throw new AppError('User already has guardian role for target', 400, 'user_already_in_team_with_role');
+      }
+
+      await createTeamUserRole(teamId, userId, 'guardian', guardianOf);
+    } else {
+      // Non-guardian roles must not duplicate
+      const existingRoles = await getTeamUserRole(teamId, userId);
+      const hasRole = existingRoles.some(r => r.role === role && r.guardianOf == null);
+      if (hasRole) {
+        throw new AppError('User already has role in team', 400, 'user_already_in_team_with_role');
+      }
+
+      await createTeamUserRole(teamId, userId, role);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Role added successfully',
+      code: 'role_added_successfully'
+    });
+  }
+);
 
 router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create', 'team'), validate(inviteUserSchema), async (req: Request, res: Response) => {
   const { teamId } = req.params;
-  let { firstName, lastName, email, preferredLanguage, role, guardianOf, guardians } = req.body;
+
+  console.log('req.body', req.body);
+
+  type guardianBody = {
+    email: string,
+    firstName?: string | undefined,
+    lastName?: string | undefined,
+    preferredLanguage: PREFERRED_LANGUAGE
+  }
+
+  let { email, role, guardianOf, guardians, firstName, lastName, preferredLanguage } = req.body as {
+    email: string, role: NORMAL_ROLES, guardianOf: string, guardians: guardianBody[], firstName?: string, lastName?: string, preferredLanguage: PREFERRED_LANGUAGE
+  };
+
+  guardians = (guardians || []).map(g => ({ ...g, email: g.email.toLowerCase().trim(), firstName: g.firstName?.trim(), lastName: g.lastName?.trim() }));
+  firstName = firstName?.trim();
+  lastName = lastName?.trim();
+
   email = email.toLowerCase().trim();
 
+  // BASIC VALIDATIONS
   if(!teamId) {
     throw new AppError('Invalid team ID', 400, 'something_went_wrong');
   }
-
+  if(guardians && guardians.length > 0 && guardians.some(g => g.email === email)) {
+    throw new AppError('Guardian cannot be the same as the user', 400, 'guardian_cannot_be_the_same_as_the_user');
+  }
   const [ team ] = await getTeamById(teamId);
   if(!team) {
     throw new AppError('Team not found', 404, 'something_went_wrong');
   }
-
-  const [ invitedUser ] = await getUserByEmail(email);
-
-  if(guardianOf) {
-    const [ guardianOfUser ] = await getTeamUser(teamId, guardianOf);
-    if(!guardianOfUser) {
-      throw new AppError('Guardian of user not found', 404, 'guardian_of_user_not_found');
-    }
+  const uniqueGuardians = new Set(guardians?.map(g => g.email) || []);
+  if(uniqueGuardians.size !== (guardians || []).length) {
+    throw new AppError('Guardian emails must be unique', 400, 'guardians_must_be_unique');
   }
 
-  let teamUser;
-  if(invitedUser) {
-    // If user exists, check if they are in the team and not invited
-    [ teamUser ] = await getTeamUser(teamId, invitedUser.id);
-    if(teamUser) {
-      throw new AppError('User already in team', 400, 'user_already_in_team');
-    }
 
-    const [ invite ] = await getInviteWithRole(teamId, invitedUser.id, role);
-    const guardianInvites = await getInviteWithRole(teamId, invitedUser.id, 'guardian');
-    if(invite && role !== 'guardian') {
-      throw new AppError('User already invited to team', 400, 'user_already_invited_to_team');
-    }
-    if(guardianInvites.some(i => i.guardianOf === guardianOf)) {
+  // VALIDATIONS FOR INVITED MAIN USER
+  let invitedUserId: string | null = null;
+  const { canBeInvited, userToBeCreated, userTeamToBeCreated, publicUser } = await userCanBeInvited(email, teamId, role, guardianOf);
+  if(!canBeInvited) {
+    throw new AppError('User already invited to team', 400, 'user_already_invited_to_team_with_role');
+  }
+  if(userToBeCreated) {
+    invitedUserId = createId();
+    await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
+  } else {
+    invitedUserId = publicUser?.id!;
+  }
+  if(userTeamToBeCreated) {
+    await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+  }
+  await createTeamUserRole(teamId, invitedUserId, role, guardianOf);
+
+  // GUARDIANS CREATION
+  for(const guardian of guardians || []) {
+    console.log('guardian', guardian);
+    const { canBeInvited, userToBeCreated, userTeamToBeCreated, publicUser: guardianPublicUser } = await userCanBeInvited(guardian.email, teamId, 'guardian', invitedUserId);
+    if(!canBeInvited) {
       throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
     }
-  }
 
-  let invitedUserId;
-  if(!invitedUser) {
-    // If no user, create one
-    const id = createId();
-    await createUser({ id, email, firstName, lastName, preferredLanguage, passwordHash: null }) as any;
-    invitedUserId = id;
-  } else {
-    invitedUserId = invitedUser.id;
-  }
-
-  const publicInvite = await inviteUser(invitedUserId, teamId, role, req.user?.sub!, guardianOf);
-
-  // Handle guardians creation
-  if(guardians) {
-    for(const guardian of guardians) {
-      let guardianId;
-      if(guardian.userId) {
-        const guardianInvites = await getInviteWithRole(teamId, guardian.userId, 'guardian');
-        if(guardianInvites.some(i => i.guardianOf === invitedUserId)) {
-          throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
-        }
-        await createTeamUserRole(teamId, guardian.userId, 'guardian', invitedUserId);
-        guardianId = guardian.userId;
-      } else {
-        const [ user ] = await getUserByEmail(guardian.email);
-        if(user) {
-          throw new AppError('User with this email already exists', 400, 'user_with_this_email_already_exists');
-        }
-        guardianId = createId();
-        await createUser({ id: guardianId, email: guardian.email.trim(), firstName: guardian.firstName, lastName: guardian.lastName, preferredLanguage: guardian.preferredLanguage, passwordHash: null });
-      }
-      if(guardianId === invitedUserId) {
-        throw new AppError('Guardian cannot be the same as the user', 400, 'guardian_cannot_be_the_same_as_the_user');
-      }
-
-      await inviteUser(guardianId, teamId, 'guardian', req.user?.sub!, invitedUserId);
+    let guardianUserId: string | null = null;
+    if(userToBeCreated) {
+      guardianUserId = createId();
+      await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true });
+    } else {
+      guardianUserId = guardianPublicUser?.id!;
     }
+    console.log('userTeamToBeCreated', userTeamToBeCreated);
+    console.log('guardianUserId', guardianUserId);
+    if(userTeamToBeCreated) {
+      await inviteUserToTeam(guardianUserId, teamId, req.user?.sub!);
+    }
+    await createTeamUserRole(teamId, guardianUserId, 'guardian', invitedUserId);
   }
 
   res.status(201).json({
     success: true,
     message: 'Invite created successfully',
     code: 'invite_created_successfully',
-    data: {
-      invite: publicInvite
-    }
   });
 });
 
-router.post('/join', requireSignedIn, async (req: Request, res: Response) => {
-  const { token } = req.body;
+// router.post('/join', async (req: Request, res: Response) => {
+//   const { token } = req.body;
 
-  const tokenHash = hashInviteToken(token)
-  const [ invite ] = await getInviteByTokenHash(tokenHash);
+//   const tokenHash = hashInviteToken(token)
+//   const [ invite ] = await getInviteByTokenHash(tokenHash);
 
-  if(!invite) {
-    throw new AppError('Invite not found', 404, 'invalid_invite');
-  }
+//   if(!invite) {
+//     throw new AppError('Invite not found', 404, 'invalid_invite');
+//   }
 
-  if(invite.validUntil < new Date()) {
-    throw new AppError('Invite expired', 400, 'invalid_invite');
-  }
+//   if(invite.userId !== req.user?.sub) {
+//     throw new AppError('User not authorized to join team', 403, 'invite_for_other_email_address');
+//   }
 
-  console.log("invite", invite)
-  const [ teamUser ] = await getTeamUser(invite.teamId, invite.userId);
+//   if(invite.validUntil < new Date()) {
+//     throw new AppError('Invite expired', 400, 'invalid_invite');
+//   }
 
-  if(!teamUser) {
-    await createTeamUser(invite.teamId, invite.userId);
-  }
+//   const [ teamUser ] = await getTeamUser(invite.teamId, invite.userId);
 
-  const [ teamUserRole ] = await getTeamUserRole(invite.teamId, invite.userId, invite.role, invite.guardianOf ?? undefined);
-  if(teamUserRole) {
-    throw new AppError('User already in team with role', 400, 'user_already_in_team_with_role');
-  }
+//   if(!teamUser) {
+//     await createTeamUser(invite.teamId, invite.userId);
+//   }
 
-  await createTeamUserRole(invite.teamId, invite.userId, invite.role, invite.guardianOf ?? undefined);
+//   const [ teamUserRole ] = await getTeamUserRole(invite.teamId, invite.userId, invite.role, invite.guardianOf ?? undefined);
+//   if(teamUserRole) {
+//     throw new AppError('User already in team with role', 400, 'user_already_in_team_with_role');
+//   }
 
-  await deleteInvite(invite.id!);
+//   await createTeamUserRole(invite.teamId, invite.userId, invite.role, 'active', invite.guardianOf ?? undefined);
 
-  return res.status(200).json({
-    success: true,
-    message: 'User joined team successfully',
-    code: 'user_joined_team_successfully'
-  });
-});
+//   await softDeleteInvite(invite.id!);
 
-// CUCKED - WE SHOULD GET INVITES NOT USER ROLES DUH
+//   return res.status(200).json({
+//     success: true,
+//     message: 'User joined team successfully',
+//     code: 'user_joined_team_successfully'
+//   });
+// });
+
 // router.delete('/:teamId/user/:userId/invite', requireSignedIn, requireScope('membership:remove', 'team'), async (req: Request, res: Response) => {
 //   const { teamId, userId } = req.params;
 
@@ -243,4 +306,3 @@ router.post('/join', requireSignedIn, async (req: Request, res: Response) => {
 // });
 
 export default router;
-do not

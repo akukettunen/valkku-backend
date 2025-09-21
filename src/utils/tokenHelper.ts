@@ -33,7 +33,8 @@ export async function generateAccessToken(user: PublicUser): Promise<string> {
       roles: team.roles.map(role => ({ role: role.role, guardianOfId: role.guardianOf })),
       teamId: team.teamId
     })) as MinimalTeamUser[],
-    jti
+    jti,
+    forcePasswordChange: user.forcePasswordChange
   }
 
   const tokenPayload = tokenUser as unknown as JWTPayload;

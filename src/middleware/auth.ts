@@ -7,7 +7,7 @@ import scopes from "@/utils/scopes"
 import { ROLES } from "@/schemas/team";
 import { TokenUser } from "@/types/user";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * Middleware that requires a valid access token.
@@ -26,6 +26,10 @@ export async function requireSignedIn(
 
     const token = authHeader.substring("Bearer ".length).trim()
     const payload = await verifyToken<TokenUser>(token)
+
+    if(payload.forcePasswordChange) {
+      throw new AppError('Force password change', 401, 'force_password_change');
+    }
 
     // attach to req for downstream handlers
     req.user = payload;

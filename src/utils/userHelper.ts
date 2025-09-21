@@ -21,9 +21,7 @@ export async function getPublicUserById(id: string, currentTeamId: string | null
 
   const teams = await getUserTeams(user.id) as TeamUser[];
   const allTeamRoles = await getUserTeamRoles(user.id) as TeamUserRole[];
-
-  console.log("teams length", teams.length)
-
+  console.log("allTeamRoles", allTeamRoles)
   const publicTeams = teams.map(team => {
     const roles = allTeamRoles.filter(role => role.teamId === team.teamId);
     return {
@@ -47,7 +45,8 @@ export async function getPublicUserById(id: string, currentTeamId: string | null
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     teams: publicTeams,
-    currentTeamId: newCurrentTeamId
+    status: user.status,
+    forcePasswordChange: user.forcePasswordChange
   };
 
   return publicUser;

@@ -2,6 +2,7 @@ import { query } from '@/db/index';
 import { TeamUser, TeamUserRole } from '@/types/team';
 import { PREFERRED_LANGUAGE, User } from '@/types/user';
 import { AppError } from '@/middleware/errors';
+import { ROLES } from '@/schemas/team';
 
 export const putUserDetails = async (user: { firstName: string; lastName: string }) => {
   const { firstName, lastName } = user;
@@ -14,11 +15,10 @@ export const putUserDetails = async (user: { firstName: string; lastName: string
 export const getUserById = async (id: string) => {
   if(id.length !== 12) {
     throw new AppError('Invalid user id', 400, 'invalid_user_id');
-    return null;
   }
 
   const result = await query('SELECT * FROM users WHERE id = ?', [id]);
-  return result;
+  return result as User[];
 };
 
 export const initializeUser = async (auth0Id: string) => {
@@ -79,6 +79,13 @@ export const getUserTeams = async (userId: string) => {
   return result as TeamUser[];
 };
 
+export const getUserTeam = async (userId: string, teamId: string) => {
+  const result = await query(`
+    SELECT * FROM team_users WHERE userId = ? AND teamId = ?
+  `, [userId, teamId]);
+  return result as TeamUser[];
+};
+
 export const getUserTeamRoles = async (userId: string) => {
   const result = await query(`
     SELECT userId, teamId, role, guardianOf, createdAt, updatedAt FROM team_user_roles WHERE userId = ?
@@ -86,12 +93,27 @@ export const getUserTeamRoles = async (userId: string) => {
   return result as TeamUserRole[];
 }
 
-export const createUser = async (user: { id: string; email: string; passwordHash: string | null; firstName: string; lastName: string; preferredLanguage: 'fi' | 'en' }) => {
-  const { id, email, passwordHash, firstName, lastName, preferredLanguage } = user;
+export const getUserTeamRole = async (userId: string, teamId: string, role: ROLES, guardianOf?: string) => {
+  if(guardianOf) {
+    const result = await query(`
+      SELECT * FROM team_user_roles WHERE userId = ? AND teamId = ? AND role = ? AND guardianOf = ?
+    `, [userId, teamId, role, guardianOf]);
+    return result as TeamUserRole[];
+  } else {
+    const result = await query(`
+      SELECT * FROM team_user_roles WHERE userId = ? AND teamId = ? AND role = ?
+    `, [userId, teamId, role]);
+    return result as TeamUserRole[];
+  }
+};
+
+
+export const createUser = async (user: { id: string; email: string; passwordHash: string | null; firstName?: string | undefined; lastName?: string | undefined; preferredLanguage: 'fi' | 'en', forcePasswordChange: boolean }) => {
+  const { id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange } = user;
 
   const result = await query(`
-    INSERT INTO users (id, email, passwordHash, firstName, lastName, preferredLanguage) VALUES (?, ?, ?, ?, ?, ?)
-  `, [id, email, passwordHash, firstName, lastName, preferredLanguage]);
+    INSERT INTO users (id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange]);
   return result;
 };
 
@@ -107,3 +129,12 @@ export const revokeSession = async (jti: string) => {
   )
   return { ok: true, jti }
 }
+
+export const updateUserPassword = async (userId: string, newPasswordHash: string) => {
+  const result = await query(`
+    UPDATE users
+    SET passwordHash = ?, updatedAt = NOW()
+    WHERE id = ?
+  `, [newPasswordHash, userId]);
+  return result;
+};

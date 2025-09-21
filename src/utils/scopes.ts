@@ -20,9 +20,9 @@ export default {
     "team:update": ["owner", "admin"],
     "team:invite": ["owner", "admin"],
     "team:leave": ["owner", "admin", "athlete", "guardian"],
-    "membership:delete": ["owner", "admin"], // owner membership cannot be removed
-    "membership:read": ["owner", "admin", "coach"],
     "membership:create": ["owner", "admin"],
+    "membership:read": ["owner", "admin", "coach"],
+    "membership:delete": ["owner", "admin"], // owner membership cannot be removed
     "team:transfer_ownership": ["owner"],
     "event:create": ["owner", "admin", "coach"],
   },

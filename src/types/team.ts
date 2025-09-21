@@ -1,5 +1,5 @@
 import { ROLES, NORMAL_ROLES } from "@/schemas/team";
-import { PREFERRED_LANGUAGE } from "@/types/user";
+import { USER_STATUS } from "@/types/user";
 
 export interface Team {
   id: string;
@@ -14,6 +14,14 @@ export interface TeamUser { // what we get from query where we join teams and te
   teamName: string;
   email: string;
   createdAt: Date;
+  status: USER_STATUS;
+  tokenHash: string;
+  validUntil: Date;
+  invitedBy: string;
+}
+
+export interface PublicTeamUser extends TeamUser {
+  roles: TeamUserRole[];
 }
 
 export interface TeamUserRole {
@@ -21,32 +29,4 @@ export interface TeamUserRole {
   userId: string;
   teamId: string;
   guardianOf?: string;
-}
-
-export interface PublicTeamUser {
-  userId: string;
-  teamId: string;
-  teamName: string;
-  email: string;
-  createdAt: Date;
-  roles: TeamUserRole[];
-}
-
-export interface Invite {
-  id?: number;
-  tokenHash: string;
-  userId: string;
-  validUntil: Date;
-  createdAt?: Date;
-  invitedBy: string;
-  teamId: string;
-  role: NORMAL_ROLES;
-  guardianOf?: string | null;
-}
-
-// Invite without userId and tokenHash
-export interface PublicInvite extends Omit<Invite, 'tokenHash'> {
-  firstName: string;
-  lastName: string;
-  email: string;
 }
