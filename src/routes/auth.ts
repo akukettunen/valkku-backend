@@ -18,7 +18,7 @@ import {
 import { createId } from '@/utils/userHelper';
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
-  const { email, password, inviteToken } = req.body;
+  const { email, password } = req.body;
 
   const [ user ] = await getUserByEmail(email) as User[];
 
