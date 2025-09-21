@@ -17,6 +17,14 @@ import {
 } from '@/db/session'
 import { createId } from '@/utils/userHelper';
 
+// Compute cross-site cookie settings depending on environment
+const getCookieOptionsBase = () => {
+  const isProdLike = process.env['NODE_ENV'] !== 'development'
+  const sameSite: 'lax' | 'strict' | 'none' = isProdLike ? 'none' : 'lax'
+  const domain = process.env['COOKIE_DOMAIN'] || undefined // e.g. .valkku.ai (optional)
+  return { isProdLike, sameSite, domain }
+}
+
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
@@ -50,10 +58,13 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
   res.set('Pragma', 'no-cache')
   res.set('Expires', '0')
 
+  const { isProdLike, sameSite: cookieSameSite, domain: cookieDomain } = getCookieOptionsBase()
+
   res.cookie("rtid", token, {
     httpOnly: true,
-    secure: process.env['NODE_ENV'] !== 'development',               // true in prod (HTTPS)
-    sameSite: "lax",
+    secure: isProdLike,               // must be true when sameSite: 'none'
+    sameSite: cookieSameSite,
+    domain: cookieDomain,
     path: "/api/auth/refresh",      // critical: only sent to refresh endpoint
     maxAge: parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 * 1000 // 90 days
   })
@@ -130,13 +141,17 @@ router.post('/refresh', async (req, res) => {
   await linkReplacedSession(session.jti, newJti)
 
   // Set rotated cookie
-  res.cookie('rtid', newToken, {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] !== 'development',
-    sameSite: 'lax',           // use 'none' + secure:true if cross-site
-    path: '/api/auth/refresh',
-    maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
-  })
+  {
+    const { isProdLike, sameSite, domain } = getCookieOptionsBase()
+    res.cookie('rtid', newToken, {
+      httpOnly: true,
+      secure: isProdLike,
+      sameSite,
+      domain,
+      path: '/api/auth/refresh',
+      maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
+    })
+  }
 
   res.set('Cache-Control', 'no-store')
   res.json({ token: accessToken })
@@ -146,12 +161,16 @@ router.post("/logout", async (req: Request, res: Response) => {
   const cookie = req.cookies['rtid']
 
   // Clear the refresh cookie
-  res.clearCookie("rtid", {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] !== "development",
-    sameSite: "lax",
-    path: "/api/auth/refresh" // 👈 must match the Path you used when setting
-  })
+  {
+    const { isProdLike, sameSite, domain } = getCookieOptionsBase()
+    res.clearCookie("rtid", {
+      httpOnly: true,
+      secure: isProdLike,
+      sameSite,
+      domain,
+      path: "/api/auth/refresh" // 👈 must match the Path you used when setting
+    })
+  }
 
   res.set("Cache-Control", "no-store")
   return res.status(204).end()

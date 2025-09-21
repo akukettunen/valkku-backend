@@ -202,42 +202,89 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 
   // VALIDATIONS FOR INVITED MAIN USER
   let invitedUserId: string | null = null;
-  const { canBeInvited, userToBeCreated, userTeamToBeCreated, publicUser } = await userCanBeInvited(email, teamId, role, guardianOf);
-  if(!canBeInvited) {
-    throw new AppError('User already invited to team', 400, 'user_already_invited_to_team_with_role');
-  }
-  if(userToBeCreated) {
-    invitedUserId = createId();
-    await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
-  } else {
-    invitedUserId = publicUser?.id!;
-  }
-  if(userTeamToBeCreated) {
-    await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
-  }
-  await createTeamUserRole(teamId, invitedUserId, role, guardianOf);
+  const mainInviteCheck = await userCanBeInvited(email, teamId, role, guardianOf);
 
-  // GUARDIANS CREATION
-  for(const guardian of guardians || []) {
-    console.log('guardian', guardian);
-    const { canBeInvited, userToBeCreated, userTeamToBeCreated, publicUser: guardianPublicUser } = await userCanBeInvited(guardian.email, teamId, 'guardian', invitedUserId);
-    if(!canBeInvited) {
-      throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
-    }
+  if (role === 'guardian') {
+    // For guardians: allow existing users without sending an invite.
+    if (!mainInviteCheck.userToBeCreated) {
+      const existingGuardianId = mainInviteCheck.publicUser!.id;
+      // Guardian cannot be the same person as the guardee
+      if (guardianOf && existingGuardianId === guardianOf) {
+        throw new AppError('User cannot be guardian of themselves', 400, 'invalid_guardian_relationship');
+      }
 
-    let guardianUserId: string | null = null;
-    if(userToBeCreated) {
-      guardianUserId = createId();
-      await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true });
+      // Ensure membership exists; if not, add directly (no invite)
+      const [existingMembership] = await getTeamUser(teamId, existingGuardianId);
+      if (!existingMembership) {
+        await createTeamUser(teamId, existingGuardianId);
+      }
+
+      // Prevent duplicate guardian relationship
+      const existingRoles = await getTeamUserRole(teamId, existingGuardianId);
+      const hasGuardianForTarget = existingRoles.some(r => r.role === 'guardian' && r.guardianOf === guardianOf);
+      if (hasGuardianForTarget) {
+        throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
+      }
+
+      await createTeamUserRole(teamId, existingGuardianId, 'guardian', guardianOf);
+      invitedUserId = existingGuardianId; // For consistency, though guardians array handling is skipped when role === 'guardian'
     } else {
-      guardianUserId = guardianPublicUser?.id!;
+      // New guardian user: create and invite
+      invitedUserId = createId();
+      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
+      await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+      await createTeamUserRole(teamId, invitedUserId, 'guardian', guardianOf);
     }
-    console.log('userTeamToBeCreated', userTeamToBeCreated);
-    console.log('guardianUserId', guardianUserId);
-    if(userTeamToBeCreated) {
+  } else {
+    // Non-guardian flow: original behavior
+    if(!mainInviteCheck.canBeInvited) {
+      throw new AppError('User already invited to team', 400, 'user_already_invited_to_team_with_role');
+    }
+    if(mainInviteCheck.userToBeCreated) {
+      invitedUserId = createId();
+      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
+    } else {
+      invitedUserId = mainInviteCheck.publicUser?.id!;
+    }
+    if(mainInviteCheck.userTeamToBeCreated) {
+      await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+    }
+    await createTeamUserRole(teamId, invitedUserId, role, guardianOf);
+  }
+
+  // GUARDIANS CREATION (only when main invited user is NOT a guardian)
+  if (role !== 'guardian') {
+    for (const guardian of guardians || []) {
+      console.log('guardian', guardian);
+
+      // If a user with this email already exists, do not invite; add membership (if needed) and guardian role directly
+      const [existingGuardian] = await getUserByEmail(guardian.email) as User[];
+      if (existingGuardian) {
+        if (existingGuardian.id === invitedUserId) {
+          throw new AppError('User cannot be guardian of themselves', 400, 'invalid_guardian_relationship');
+        }
+
+        const [membership] = await getTeamUser(teamId, existingGuardian.id);
+        if (!membership) {
+          await createTeamUser(teamId, existingGuardian.id);
+        }
+
+        const existingRoles = await getTeamUserRole(teamId, existingGuardian.id);
+        const hasGuardianForTarget = existingRoles.some(r => r.role === 'guardian' && r.guardianOf === invitedUserId);
+        if (hasGuardianForTarget) {
+          throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
+        }
+
+        await createTeamUserRole(teamId, existingGuardian.id, 'guardian', invitedUserId!);
+        continue;
+      }
+
+      // Otherwise, create new user, invite to team, and add guardian role
+      const guardianUserId = createId();
+      await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true });
       await inviteUserToTeam(guardianUserId, teamId, req.user?.sub!);
+      await createTeamUserRole(teamId, guardianUserId, 'guardian', invitedUserId!);
     }
-    await createTeamUserRole(teamId, guardianUserId, 'guardian', invitedUserId);
   }
 
   res.status(201).json({
