@@ -10,6 +10,13 @@ export function createId(): string {
   return nanoid();
 }
 
+export function createPassword(): string {
+  const alphabet = '123456789ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijklmnpqrstuvwxyz';
+  const nanoid = customAlphabet(alphabet, 10);
+
+  return nanoid();
+}
+
 export async function getPublicUserById(id: string, currentTeamId: string | null) {
   const [ user ] = await getUserById(id) as User[];
 
@@ -37,6 +44,7 @@ export async function getPublicUserById(id: string, currentTeamId: string | null
 
   const publicUser: PublicUser = {
     id: user.id,
+    email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
     pendingDetails: user.pendingDetails,

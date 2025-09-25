@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation';
-import { createTeamSchema, NORMAL_ROLES } from '@/schemas/team';
-import { createTeam, createTeamUser, createTeamUserRole, getTeamById, getTeamTeamUserRoles } from '@/db/team';
-import { getUserById, getUserByEmail, createUser } from '@/db/user';
+import { createTeamSchema, NORMAL_ROLES, ROLES } from '@/schemas/team';
+import { createTeam, createTeamUser, createTeamUserRole, deleteTeamUserRolesForUser, deleteTeamUser, getTeamById, getTeamTeamUserRoles, deleteTeamUserRole, getTeamUserRolesForGuardian, getTeamUserByTokenHash, setUserTeamActive } from '@/db/team';
+import { getUserById, getUserByEmail, createUser, deleteUser, updateUserPassword, updateUserDetails, setForcePasswordChange } from '@/db/user';
 import { PREFERRED_LANGUAGE, PublicUser, User, UserInTeam } from '@/types/user';
-import { getTeamUsers, getTeamUser, getTeamUserRole } from '@/db/team';
+import { getTeamUsers, getTeamUser, getTeamUserRoles } from '@/db/team';
 import { getPublicUserById } from '@/utils/userHelper';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { inviteUserSchema } from '@/schemas/team';
@@ -14,7 +14,7 @@ import { hashInviteToken } from '@/utils/tokenHelper';
 import { generateAccessToken } from '@/utils/tokenHelper';
 import { inviteUserToTeam, userCanBeInvited } from '@/utils/teamHelper';
 import { createId } from '@/utils/userHelper';
-import { TeamUserRole } from '@/types/team';
+import { hashPassword } from '@/utils/authHelper';
 
 const router: Router = Router();
 
@@ -135,7 +135,7 @@ router.post(
       if (!guarded) {
         throw new AppError('Guardian target not in team', 400, 'guardian_target_not_in_team');
       }
-      const existingGuardianRoles = await getTeamUserRole(teamId, userId);
+      const existingGuardianRoles = await getTeamUserRoles(teamId, userId);
       const hasGuardianForTarget = existingGuardianRoles.some(r => r.role === 'guardian' && r.guardianOf === guardianOf);
       if (hasGuardianForTarget) {
         throw new AppError('User already has guardian role for target', 400, 'user_already_in_team_with_role');
@@ -144,7 +144,7 @@ router.post(
       await createTeamUserRole(teamId, userId, 'guardian', guardianOf);
     } else {
       // Non-guardian roles must not duplicate
-      const existingRoles = await getTeamUserRole(teamId, userId);
+      const existingRoles = await getTeamUserRoles(teamId, userId);
       const hasRole = existingRoles.some(r => r.role === role && r.guardianOf == null);
       if (hasRole) {
         throw new AppError('User already has role in team', 400, 'user_already_in_team_with_role');
@@ -216,11 +216,11 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
       // Ensure membership exists; if not, add directly (no invite)
       const [existingMembership] = await getTeamUser(teamId, existingGuardianId);
       if (!existingMembership) {
-        await createTeamUser(teamId, existingGuardianId);
+        await createTeamUser(teamId, existingGuardianId, 'active');
       }
 
       // Prevent duplicate guardian relationship
-      const existingRoles = await getTeamUserRole(teamId, existingGuardianId);
+      const existingRoles = await getTeamUserRoles(teamId, existingGuardianId);
       const hasGuardianForTarget = existingRoles.some(r => r.role === 'guardian' && r.guardianOf === guardianOf);
       if (hasGuardianForTarget) {
         throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
@@ -231,23 +231,29 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
     } else {
       // New guardian user: create and invite
       invitedUserId = createId();
-      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
+      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
       await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
       await createTeamUserRole(teamId, invitedUserId, 'guardian', guardianOf);
     }
   } else {
     // Non-guardian flow: original behavior
     if(!mainInviteCheck.canBeInvited) {
-      throw new AppError('User already invited to team', 400, 'user_already_invited_to_team_with_role');
+      throw new AppError('User already invited to team', 400, 'user_already_invited_to_team');
     }
     if(mainInviteCheck.userToBeCreated) {
       invitedUserId = createId();
-      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true });
+      await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
     } else {
       invitedUserId = mainInviteCheck.publicUser?.id!;
     }
     if(mainInviteCheck.userTeamToBeCreated) {
-      await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+      if(mainInviteCheck.userToBeCreated) {
+        // New user - send invite
+        await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+      } else {
+        // Existing user - add directly with active status
+        await createTeamUser(teamId, invitedUserId, 'active');
+      }
     }
     await createTeamUserRole(teamId, invitedUserId, role, guardianOf);
   }
@@ -266,10 +272,10 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 
         const [membership] = await getTeamUser(teamId, existingGuardian.id);
         if (!membership) {
-          await createTeamUser(teamId, existingGuardian.id);
+          await createTeamUser(teamId, existingGuardian.id, 'active');
         }
 
-        const existingRoles = await getTeamUserRole(teamId, existingGuardian.id);
+        const existingRoles = await getTeamUserRoles(teamId, existingGuardian.id);
         const hasGuardianForTarget = existingRoles.some(r => r.role === 'guardian' && r.guardianOf === invitedUserId);
         if (hasGuardianForTarget) {
           throw new AppError('Guardian already invited to team', 400, 'guardian_already_invited_to_team_for_this_user');
@@ -281,7 +287,7 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 
       // Otherwise, create new user, invite to team, and add guardian role
       const guardianUserId = createId();
-      await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true });
+      await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
       await inviteUserToTeam(guardianUserId, teamId, req.user?.sub!);
       await createTeamUserRole(teamId, guardianUserId, 'guardian', invitedUserId!);
     }
@@ -334,22 +340,243 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 //   });
 // });
 
-// router.delete('/:teamId/user/:userId/invite', requireSignedIn, requireScope('membership:remove', 'team'), async (req: Request, res: Response) => {
-//   const { teamId, userId } = req.params;
+router.delete('/:teamId/user/:userId/role/:role', requireSignedIn, requireScope('membership:delete', 'team'), async (req: Request, res: Response) => {
+  const { teamId, userId, role } = req.params as { teamId: string, userId: string, role: ROLES };
+  const { guardianOf } = req.query as { guardianOf?: string };
 
-//   const userTeamRoles = await getTeamUserRoles(teamId!, userId!);
+  if(!teamId || !userId || !role) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+  if(role === 'guardian' && !guardianOf) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+  // check role is in the array of roles
+  if(!['admin', 'coach', 'athlete', 'guardian'].includes(role)) {
+    throw new AppError('Invalid role', 400, 'invalid_role');
+  }
 
-//   if(userTeam.role === 'owner') {
-//     throw new AppError('Owner cannot be removed from team', 400, 'owner_cannot_be_removed_from_team');
-//   }
+  const [ user ] = await getUserById(userId) as User[];
+  if(!user) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
 
-//   await deleteInvite(teamId!, userId!);
+  await deleteTeamUserRole(teamId, userId, role, guardianOf);
 
-//   return res.status(200).json({
-//     success: true,
-//     message: 'Invite deleted successfully',
-//     code: 'invite_deleted_successfully'
-//   });
-// });
+  res.json({
+    success: true,
+    message: 'Role deleted successfully',
+    code: 'role_deleted_successfully'
+  });
+});
+
+router.delete('/:teamId/user/:userId', requireSignedIn, requireScope('membership:delete', 'team'), async (req: Request, res: Response) => {
+  const { teamId, userId } = req.params;
+
+  if(!teamId || !userId) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+
+  const [ userTeam ] = await getTeamUser(teamId, userId);
+  const [ user ] = await getUserById(userId) as User[];
+
+  const willDeleteUser = !user?.passwordHash; // if user has no password, it means it's an invited user
+
+  if(!userTeam) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+
+  const teamUserRoles = await getTeamUserRoles(teamId, userId);
+  if(teamUserRoles.some(r => r.role === 'owner')) {
+    throw new AppError('Cannot delete owner role', 400, 'cannot_delete_owner_role');
+  }
+
+  const guardiansTeamUserRoles = await getTeamUserRolesForGuardian(teamId, userId);
+  if(guardiansTeamUserRoles.length > 0) {
+    throw new AppError('Cannot delete user if there are guardians', 400, 'cannot_delete_user_if_there_are_guardians');
+  }
+
+  await deleteTeamUserRolesForUser(teamId, userId);
+  await deleteTeamUser(teamId, userId);
+  if(willDeleteUser) {
+    await deleteUser(userId);
+  }
+
+  res.json({
+    success: true,
+    message: 'User deleted successfully',
+    code: 'user_deleted_successfully'
+  });
+});
+
+const updateTeamUserRoleSchema = z.object({
+  roles: z.array(z.object({
+    role: z.enum(['admin', 'coach', 'athlete'], { error: 'Role is required' })
+  })),
+})
+
+router.patch('/:teamId/user/:userId/role', requireSignedIn, requireScope('membership:create', 'team'), requireScope('membership:delete', 'team'), validate(updateTeamUserRoleSchema), async (req: Request, res: Response) => {
+  const { teamId, userId } = req.params;
+  const { roles } = req.body as { roles: { role: NORMAL_ROLES }[] };
+
+  console.log('roles', roles);
+
+  if(!teamId || !userId || !roles) {
+    console.log('Invalid parameters');
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+
+  const teamUserRoles = await getTeamUserRoles(teamId, userId);
+
+  if(roles.length === 0 && !teamUserRoles.some(r => r.role === 'guardian') && !teamUserRoles.some(r => r.role === 'owner')) {
+    throw new AppError('Invalid parameters', 400, 'no_roles_left_after_deletion');
+  }
+
+  const deleteRoles = teamUserRoles.filter(r => !roles.some(r2 => r2.role === r.role) && r.role !== 'owner' && r.role !== 'guardian');
+  const createRoles = roles.filter(r => !teamUserRoles.some(r2 => r2.role === r.role));
+
+  if(deleteRoles.some(r => r.role === 'athlete')) {
+    const guardians = await getTeamUserRolesForGuardian(teamId, userId);
+
+    if(guardians && guardians.length > 0) {
+      throw new AppError('Cannot delete athlete role if there are guardians', 400, 'cannot_delete_athlete_role_if_there_are_guardians');
+    }
+  }
+
+  for (const role of deleteRoles) {
+    await deleteTeamUserRole(teamId, userId, role.role, role.guardianOf);
+  }
+
+  for (const role of createRoles) {
+    await createTeamUserRole(teamId, userId, role.role);
+  }
+
+  res.json({
+    success: true,
+    message: 'Team user role updated successfully',
+    code: 'team_user_role_updated_successfully'
+  });
+});
+
+router.post('/join', async (req: Request, res: Response) => {
+  const { token, password, repeatPassword, firstName, lastName, preferredLanguage } = req.body;
+
+  if(!token) {
+    throw new AppError('Token is required', 400, 'something_went_wrong');
+  }
+
+  const tokenHash = hashInviteToken(token as string);
+  const [ invite ] = await getTeamUserByTokenHash(tokenHash);
+
+  if(!invite) {
+    throw new AppError('Invite not found', 404, 'invalid_invite');
+  }
+
+  const [ user ] = await getUserById(invite?.userId) as User[];
+  if(!user) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+  if((user.forcePasswordChange || !user.passwordHash) && (!password || password !== repeatPassword)) {
+    throw new AppError('Password does not match', 400, 'password_does_not_match');
+  }
+  if(!user.firstName && !firstName) {
+    throw new AppError('First name is required', 400, 'first_name_is_required');
+  }
+  if(!user.lastName && !lastName) {
+    throw new AppError('Last name is required', 400, 'last_name_is_required');
+  }
+  if(user.forcePasswordChange || !user.passwordHash) {
+    const passwordHash = await hashPassword(password);
+    await updateUserPassword(user.id, passwordHash);
+  }
+  if(firstName || lastName || preferredLanguage) {
+    await updateUserDetails({ firstName, lastName, preferredLanguage }, user.id);
+  }
+
+  await setUserTeamActive(invite.teamId, user.id);
+  await setForcePasswordChange(user.id, false);
+
+  res.json({
+    success: true,
+    message: 'Joined team successfully',
+    code: 'joined_team'
+  });
+});
+
+router.post('/get-join', async (req: Request, res: Response) => {
+  const { token } = req.body;
+
+  const tokenHash = hashInviteToken(token);
+  const [ invite ] = await getTeamUserByTokenHash(tokenHash);
+
+  if(!invite || !invite.userId) {
+    throw new AppError('Invite not found', 404, 'invalid_invite');
+  }
+
+  const [ user ] = await getUserById(invite?.userId) as User[];
+
+  if(invite.validUntil < new Date()) {
+    throw new AppError('Invite expired', 400, 'invalid_invite');
+  }
+
+  res.json({
+    success: true,
+    message: 'Invite found',
+    code: 'invite_found',
+    data: {
+      team_user: { ...invite, tokenHash: undefined },
+      user: { ...user, passwordHash: undefined }
+    }
+  });
+});
+
+router.delete('/:teamId/self/:userId', requireSignedIn, requireScope('membership:delete', 'individual'), async (req: Request, res: Response) => {
+  const { teamId, userId } = req.params;
+
+  if(!teamId || !userId) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+
+  const teamUserRoles = await getTeamUserRoles(teamId, userId);
+  if(teamUserRoles.some(r => r.role === 'owner')) {
+    throw new AppError('Cannot delete owner role', 400, 'cannot_delete_owner_role');
+  }
+
+  await deleteTeamUser(teamId, userId);
+
+  res.json({
+    success: true,
+    message: 'Team user deleted successfully',
+    code: 'team_user_deleted_successfully'
+  });
+});
+
+router.put('/ownership', requireSignedIn, requireScope('ownership:transfer', 'team'), async (req: Request, res: Response) => {
+  const { teamId, userId } = req.params;
+  const { newOwnerId } = req.body;
+
+  if(!teamId || !userId || !newOwnerId) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+  const [ oldOwner ] = await getUserById(userId) as User[];
+  if(!oldOwner) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+  const [ newOwner ] = await getUserById(newOwnerId) as User[];
+  if(!newOwner) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+  if(!newOwner.passwordHash) {
+    throw new AppError('User has no password', 400, 'new_owner_not_signed_up');
+  }
+
+  await createTeamUserRole(teamId, newOwnerId, 'owner');
+  await deleteTeamUserRole(teamId, userId, 'owner');
+
+  res.json({
+    success: true,
+    message: 'Ownership transferred successfully',
+    code: 'ownership_transferred_successfully'
+  });
+});
 
 export default router;

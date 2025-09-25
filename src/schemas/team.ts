@@ -38,8 +38,8 @@ export const inviteUserSchema = z.object({
   message: "Guardian email or userId cannot be the same as the email.",
   path: ['guardians']
 })
-.refine(data => !data.guardians || data.role === 'athlete', {
-  message: "If guardians are provided, role must be 'athlete'.",
+.refine(data => !data.guardians || data.guardians.length === 0 || data.role === 'athlete', {
+  message: "If guardians are provided (non-empty), role must be 'athlete'.",
   path: ['role']
 })
 .refine(data => !data.guardianOf || data.role === 'guardian', {

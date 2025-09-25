@@ -8,6 +8,7 @@ import { PublicUser, User } from '@/types/user';
 import { getUserTeam, getUserTeamRole } from '@/db/user';
 import { PREFERRED_LANGUAGE } from '@/types/user';
 import { getPublicUserById } from './userHelper';
+import { getTeamUserRoles } from '@/db/team';
 
 export const userCanBeInvited = async (
   email: string,
@@ -58,8 +59,18 @@ export const userCanBeInvited = async (
     };
   }
 
+  const userTeamRoles = await getTeamUserRoles(teamId, user.id);
+  if(userTeamRoles.length && userTeamRoles.some(r => r.role !== 'guardian')) {
+    return {
+      canBeInvited: false,
+      userToBeCreated: false,
+      userTeamToBeCreated: false,
+      publicUser
+    };
+  }
+
   return {
-    canBeInvited: false,
+    canBeInvited: true,
     userToBeCreated: false,
     userTeamToBeCreated: false,
     publicUser

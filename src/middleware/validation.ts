@@ -9,20 +9,7 @@ export const validate = (schema: ZodSchema) => {
       await schema.parseAsync(req.body);
       return next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.issues.map(issue => ({
-            field: issue.path.join('.'),
-            message: issue.message
-          }))
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Internal validation error'
-      });
+      return next(error);
     }
   };
 };
@@ -34,20 +21,7 @@ export const validateQuery = (schema: ZodSchema) => {
       await schema.parseAsync(req.query);
       return next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Query validation failed',
-          errors: error.issues.map(issue => ({
-            field: issue.path.join('.'),
-            message: issue.message
-          }))
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Internal validation error'
-      });
+      return next(error);
     }
   };
 };
@@ -59,20 +33,7 @@ export const validateParams = (schema: ZodSchema) => {
       await schema.parseAsync(req.params);
       return next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Parameter validation failed',
-          errors: error.issues.map(issue => ({
-            field: issue.path.join('.'),
-            message: issue.message
-          }))
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Internal validation error'
-      });
+      return next(error);
     }
   };
 };
@@ -96,20 +57,7 @@ export const validateRequest = (schemas: {
       }
       return next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Request validation failed',
-          errors: error.issues.map(issue => ({
-            field: issue.path.join('.'),
-            message: issue.message
-          }))
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        message: 'Internal validation error'
-      });
+      return next(error);
     }
   };
 };

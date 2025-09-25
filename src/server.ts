@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { promisePoolEnd } from '@/db';
 import app from './app';
+import { startCronJobs } from '@/cron';
 
 // Load environment variables
 dotenv.config({ quiet: true });
@@ -12,6 +13,8 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`📱 Environment: ${process.env['NODE_ENV'] || 'development'}`);
   console.log(`🌐 Health check: http://localhost:${port}/health`);
+  // Start background cron jobs
+  startCronJobs();
 });
 
 // Graceful shutdown handlers

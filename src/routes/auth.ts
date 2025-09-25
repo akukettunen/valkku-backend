@@ -29,7 +29,7 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
   const { email, password } = req.body;
 
   const [ user ] = await getUserByEmail(email) as User[];
-
+  console.log('user', user);
   const candidateHash = user?.passwordHash ?? '$argon2id$v=19$m=65536,t=3,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
   const isPasswordValid = await verifyPassword(candidateHash, password);
 
@@ -93,7 +93,7 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
   }
 
   const passwordHash = await hashPassword(password);
-  await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange: false }) as any;
+  await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange: false, emailConfirmed: false }) as any;
 
   return res.status(201).json({
     success: true,
@@ -141,17 +141,15 @@ router.post('/refresh', async (req, res) => {
   await linkReplacedSession(session.jti, newJti)
 
   // Set rotated cookie
-  {
-    const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-    res.cookie('rtid', newToken, {
-      httpOnly: true,
-      secure: isProdLike,
-      sameSite,
-      domain,
-      path: '/api/auth/refresh',
-      maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
-    })
-  }
+  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
+  res.cookie('rtid', newToken, {
+    httpOnly: true,
+    secure: isProdLike,
+    sameSite,
+    domain,
+    path: '/api/auth/refresh',
+    maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
+  })
 
   res.set('Cache-Control', 'no-store')
   res.json({ token: accessToken })
@@ -161,16 +159,14 @@ router.post("/logout", async (req: Request, res: Response) => {
   const cookie = req.cookies['rtid']
 
   // Clear the refresh cookie
-  {
-    const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-    res.clearCookie("rtid", {
-      httpOnly: true,
-      secure: isProdLike,
-      sameSite,
-      domain,
-      path: "/api/auth/refresh" // 👈 must match the Path you used when setting
-    })
-  }
+  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
+  res.clearCookie("rtid", {
+    httpOnly: true,
+    secure: isProdLike,
+    sameSite,
+    domain,
+    path: "/api/auth/refresh" // 👈 must match the Path you used when setting
+  })
 
   res.set("Cache-Control", "no-store")
   return res.status(204).end()

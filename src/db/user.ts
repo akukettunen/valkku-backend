@@ -65,6 +65,13 @@ export const updateUserDetails = async (updates: { emojiClickedCount?: number; f
   return result;
 };
 
+export const setForcePasswordChange = async (userId: string, forcePasswordChange: boolean) => {
+  const result = await query(`
+    UPDATE users SET forcePasswordChange = ? WHERE id = ?
+  `, [forcePasswordChange, userId]);
+  return result;
+};
+
 export const getUserTeams = async (userId: string) => {
   const result = await query(`
     SELECT
@@ -88,7 +95,18 @@ export const getUserTeam = async (userId: string, teamId: string) => {
 
 export const getUserTeamRoles = async (userId: string) => {
   const result = await query(`
-    SELECT userId, teamId, role, guardianOf, createdAt, updatedAt FROM team_user_roles WHERE userId = ?
+    SELECT
+      team_user_roles.userId,
+      team_user_roles.teamId,
+      team_user_roles.role,
+      team_user_roles.guardianOf,
+      team_user_roles.createdAt,
+      team_user_roles.updatedAt,
+      guardee.email as guardianOfEmail,
+      guardee.fullName as guardianOfFullName
+    FROM team_user_roles
+    LEFT JOIN users as guardee ON guardee.id = team_user_roles.guardianOf
+    WHERE userId = ?
   `, [userId])
   return result as TeamUserRole[];
 }
@@ -108,12 +126,19 @@ export const getUserTeamRole = async (userId: string, teamId: string, role: ROLE
 };
 
 
-export const createUser = async (user: { id: string; email: string; passwordHash: string | null; firstName?: string | undefined; lastName?: string | undefined; preferredLanguage: 'fi' | 'en', forcePasswordChange: boolean }) => {
-  const { id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange } = user;
+export const createUser = async (user: { id: string; email: string; passwordHash: string | null; emailConfirmed: boolean; firstName?: string | undefined; lastName?: string | undefined; preferredLanguage: 'fi' | 'en', forcePasswordChange: boolean }) => {
+  const { id, email, passwordHash, emailConfirmed, firstName, lastName, preferredLanguage, forcePasswordChange } = user;
 
   const result = await query(`
-    INSERT INTO users (id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [id, email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange]);
+    INSERT INTO users (id, email, passwordHash, emailConfirmed, firstName, lastName, preferredLanguage, forcePasswordChange) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [id, email, passwordHash, emailConfirmed, firstName, lastName, preferredLanguage, forcePasswordChange]);
+  return result;
+};
+
+export const deleteUser = async (userId: string) => {
+  const result = await query(`
+    DELETE FROM users WHERE id = ?
+  `, [userId]);
   return result;
 };
 
@@ -133,7 +158,7 @@ export const revokeSession = async (jti: string) => {
 export const updateUserPassword = async (userId: string, newPasswordHash: string) => {
   const result = await query(`
     UPDATE users
-    SET passwordHash = ?, updatedAt = NOW()
+    SET passwordHash = ?
     WHERE id = ?
   `, [newPasswordHash, userId]);
   return result;

@@ -44,7 +44,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should return 400 with validation errors when body is invalid', async () => {
+    it('should forward ZodError to next() for global error handler', async () => {
       mockRequest.body = {
         name: '',
         email: 'invalid-email',
@@ -54,29 +54,12 @@ describe('Validation Middleware', () => {
       const middleware = validate(userSchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'name',
-            message: 'Name is required'
-          }),
-          expect.objectContaining({
-            field: 'email',
-            message: 'Invalid email format'
-          }),
-          expect.objectContaining({
-            field: 'age',
-            message: 'Must be at least 18 years old'
-          })
-        ])
-      });
-      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when required fields are missing', async () => {
+    it('should forward ZodError when required fields are missing', async () => {
       mockRequest.body = {
         name: 'John Doe'
         // missing email and age
@@ -85,24 +68,12 @@ describe('Validation Middleware', () => {
       const middleware = validate(userSchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'email',
-            message: expect.any(String)
-          }),
-          expect.objectContaining({
-            field: 'age',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should handle nested object validation', async () => {
+    it('should forward ZodError for nested object validation', async () => {
       const nestedSchema = z.object({
         user: z.object({
           profile: z.object({
@@ -124,21 +95,9 @@ describe('Validation Middleware', () => {
       const middleware = validate(nestedSchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'user.profile.firstName',
-            message: expect.any(String)
-          }),
-          expect.objectContaining({
-            field: 'user.profile.lastName',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
   });
 
@@ -163,7 +122,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.status).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when query parameters are invalid', async () => {
+    it('should forward ZodError when query parameters are invalid', async () => {
       mockRequest.query = {
         page: '0',
         limit: '200',
@@ -173,24 +132,12 @@ describe('Validation Middleware', () => {
       const middleware = validateQuery(querySchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Query validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'page',
-            message: expect.any(String)
-          }),
-          expect.objectContaining({
-            field: 'limit',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should handle missing required query parameters', async () => {
+    it('should forward ZodError when missing required query parameters', async () => {
       mockRequest.query = {
         search: 'test'
         // missing page and limit
@@ -199,21 +146,9 @@ describe('Validation Middleware', () => {
       const middleware = validateQuery(querySchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Query validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'page',
-            message: expect.any(String)
-          }),
-          expect.objectContaining({
-            field: 'limit',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
   });
 
@@ -236,7 +171,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.status).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when params are invalid', async () => {
+    it('should forward ZodError when params are invalid', async () => {
       mockRequest.params = {
         id: 'invalid-uuid',
         teamId: ''
@@ -245,21 +180,9 @@ describe('Validation Middleware', () => {
       const middleware = validateParams(paramsSchema);
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Parameter validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'id',
-            message: 'Invalid UUID format'
-          }),
-          expect.objectContaining({
-            field: 'teamId',
-            message: 'Team ID is required'
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
   });
 
@@ -316,7 +239,7 @@ describe('Validation Middleware', () => {
       expect(mockResponse.status).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when body validation fails', async () => {
+    it('should forward ZodError when body validation fails', async () => {
       mockRequest.body = {
         name: '',
         email: 'invalid-email'
@@ -332,24 +255,12 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Request validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'name',
-            message: expect.any(String)
-          }),
-          expect.objectContaining({
-            field: 'email',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when query validation fails', async () => {
+    it('should forward ZodError when query validation fails', async () => {
       mockRequest.body = {
         name: 'John Doe',
         email: 'john@example.com'
@@ -365,20 +276,12 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Request validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'page',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when params validation fails', async () => {
+    it('should forward ZodError when params validation fails', async () => {
       mockRequest.body = {
         name: 'John Doe',
         email: 'john@example.com'
@@ -394,17 +297,9 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Request validation failed',
-        errors: expect.arrayContaining([
-          expect.objectContaining({
-            field: 'id',
-            message: expect.any(String)
-          })
-        ])
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
     });
 
     it('should handle empty schemas object', async () => {
@@ -418,7 +313,7 @@ describe('Validation Middleware', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle non-ZodError exceptions in validate', async () => {
+    it('should forward non-ZodError exceptions in validate', async () => {
       const schema = z.object({
         name: z.string()
       });
@@ -432,18 +327,15 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Internal validation error'
-      });
-      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
 
       // Restore original method
       schema.parseAsync = originalParseAsync;
     });
 
-    it('should handle non-ZodError exceptions in validateQuery', async () => {
+    it('should forward non-ZodError exceptions in validateQuery', async () => {
       const schema = z.object({
         page: z.string()
       });
@@ -455,16 +347,14 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Internal validation error'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
 
       schema.parseAsync = originalParseAsync;
     });
 
-    it('should handle non-ZodError exceptions in validateParams', async () => {
+    it('should forward non-ZodError exceptions in validateParams', async () => {
       const schema = z.object({
         id: z.string()
       });
@@ -476,16 +366,14 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Internal validation error'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
 
       schema.parseAsync = originalParseAsync;
     });
 
-    it('should handle non-ZodError exceptions in validateRequest', async () => {
+    it('should forward non-ZodError exceptions in validateRequest', async () => {
       const bodySchema = z.object({
         name: z.string()
       });
@@ -497,11 +385,9 @@ describe('Validation Middleware', () => {
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Internal validation error'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
 
       bodySchema.parseAsync = originalParseAsync;
     });

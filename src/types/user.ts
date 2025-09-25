@@ -25,6 +25,7 @@ export interface User {
 
 export interface PublicUser {
   id: string;
+  email: string;
   status: USER_STATUS;
   firstName?: string | undefined;
   lastName?: string | undefined;

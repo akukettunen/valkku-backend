@@ -25,12 +25,13 @@ export default {
     "membership:delete": ["owner", "admin"], // owner membership cannot be removed
     "team:transfer_ownership": ["owner"],
     "event:create": ["owner", "admin", "coach"],
+    "ownership:transfer": ["owner"],
   },
   "individual": { // actions regarding ones own stuff
-    "event:create": [ "athlete", "guardian"], // create event for self or guarded athlete
-    "event:read": [ "athlete", "guardian"],
-    "event:update": [ "athlete", "guardian"],
-    "event:delete": [ "athlete", "guardian"],
-    "membership:delete": ["athlete"],
+    "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete
+    "event:read": [ "self", "guardian-as-athlete"],
+    "event:update": [ "self", "guardian-as-athlete"],
+    "event:delete": [ "self", "guardian-as-athlete"],
+    "membership:delete": ["self"],
   }
 } as const;
