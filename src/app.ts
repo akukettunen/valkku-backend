@@ -34,8 +34,7 @@ const defaultOriginsByEnv: Record<string, string[]> = {
     'http://localhost:3000',
   ],
   staging: [
-    'https://dev.d1k20vvxxmhyxj.amplifyapp.com',
-    'https://dev.d1k20vvxxmhyxj.amplifyapp.com',
+    'https://dev.valkku.ai'
   ],
   production: [
     'https://valkku.ai',
@@ -44,7 +43,6 @@ const defaultOriginsByEnv: Record<string, string[]> = {
     'https://valkku.com',
     'https://app.valkku.com',
     'https://www.valkku.com',
-    'https://prod.d1k20vvxxmhyxj.amplifyapp.com'
   ]
 };
 

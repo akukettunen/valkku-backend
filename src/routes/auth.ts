@@ -8,7 +8,7 @@ const router: Router = Router();
 import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
 import { verifyPassword } from "@/utils/authHelper";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/utils/tokenHelper";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, attachRefreshCookie, clearRefreshCookie } from "@/utils/tokenHelper";
 import { requireSignedIn } from "@/middleware/auth";
 import {
   findSessionByHash,
@@ -17,13 +17,6 @@ import {
 } from '@/db/session'
 import { createId } from '@/utils/userHelper';
 
-// Compute cross-site cookie settings depending on environment
-const getCookieOptionsBase = () => {
-  const isProdLike = process.env['NODE_ENV'] !== 'development'
-  const sameSite: 'lax' | 'strict' | 'none' = isProdLike ? 'none' : 'lax'
-  const domain = process.env['COOKIE_DOMAIN'] || undefined // e.g. .valkku.ai (optional)
-  return { isProdLike, sameSite, domain }
-}
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -54,20 +47,8 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
     userAgent: req.headers['user-agent'] ?? null
   })
 
-  res.set('Cache-Control', 'no-store')
-  res.set('Pragma', 'no-cache')
-  res.set('Expires', '0')
 
-  const { isProdLike, sameSite: cookieSameSite, domain: cookieDomain } = getCookieOptionsBase()
-
-  res.cookie("rtid", token, {
-    httpOnly: true,
-    secure: isProdLike,               // must be true when sameSite: 'none'
-    sameSite: cookieSameSite,
-    domain: cookieDomain,
-    path: "/api/auth/refresh",      // critical: only sent to refresh endpoint
-    maxAge: parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 * 1000 // 90 days
-  })
+  attachRefreshCookie(res, token, expiresAt)
 
   return res.status(200).json({
     success: true,
@@ -187,18 +168,8 @@ router.post('/refresh', async (req, res) => {
   console.log('🔍 [REFRESH] Session linked successfully');
 
   // Set rotated cookie
-  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-  console.log('🔍 [REFRESH] Cookie options:', { isProdLike, sameSite, domain });
-  console.log('🔍 [REFRESH] Setting new cookie with maxAge:', Math.max(0, new Date(expiresAt).getTime() - Date.now()));
-
-  res.cookie('rtid', newToken, {
-    httpOnly: true,
-    secure: isProdLike,
-    sameSite,
-    domain,
-    path: '/api/auth/refresh',
-    maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
-  })
+  console.log('🔍 [REFRESH] Setting new cookie with expiresAt:', expiresAt);
+  attachRefreshCookie(res, newToken, expiresAt)
   console.log('🔍 [REFRESH] New cookie set successfully');
 
   res.set('Cache-Control', 'no-store')
@@ -210,14 +181,7 @@ router.post("/logout", async (req: Request, res: Response) => {
   const cookie = req.cookies['rtid']
 
   // Clear the refresh cookie
-  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-  res.clearCookie("rtid", {
-    httpOnly: true,
-    secure: isProdLike,
-    sameSite,
-    domain,
-    path: "/api/auth/refresh" // 👈 must match the Path you used when setting
-  })
+  clearRefreshCookie(res)
 
   res.set("Cache-Control", "no-store")
   return res.status(204).end()
