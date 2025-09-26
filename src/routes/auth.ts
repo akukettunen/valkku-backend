@@ -103,32 +103,75 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 });
 
 router.post('/refresh', async (req, res) => {
+  console.log('🔄 [REFRESH] Request received');
+  console.log('🔄 [REFRESH] Headers:', req.headers);
+  console.log('🔄 [REFRESH] Cookies:', req.cookies);
+  console.log('🔄 [REFRESH] User-Agent:', req.headers['user-agent']);
+  console.log('🔄 [REFRESH] IP:', req.ip);
+  console.log('🔄 [REFRESH] Raw cookie value:', req.cookies?.rtid);
+
   const cookie = req.cookies?.rtid
 
   if (!cookie) {
+    console.log('❌ [REFRESH] Missing refresh token cookie');
     throw new AppError('Missing refresh token', 401, 'missing_refresh')
   }
 
+  console.log('🔍 [REFRESH] Cookie found, hashing token');
   const hash = hashRefreshToken(cookie)
+  console.log('🔍 [REFRESH] Token hash created');
+
   const session = await findSessionByHash(hash)
+  console.log('🔍 [REFRESH] Session lookup result:', !!session);
+  console.log('🔍 [REFRESH] Session details:', session ? {
+    jti: session.jti,
+    userId: session.userId,
+    expiresAt: session.expiresAt,
+    revokedAt: session.revokedAt,
+    ip: session.ip,
+    userAgent: session.userAgent
+  } : null);
 
   if (!session) {
+    console.log('❌ [REFRESH] Invalid refresh token - session not found');
     throw new AppError('Invalid refresh token', 401, 'invalid_refresh')
   }
   if (session.revokedAt) {
+    console.log('❌ [REFRESH] Refresh token revoked at:', session.revokedAt);
     throw new AppError('Refresh token revoked', 401, 'refresh_revoked')
   }
-  if (new Date(session.expiresAt) < new Date()) {
+
+  const now = new Date();
+  const sessionExpiresAt = new Date(session.expiresAt);
+  console.log('🔍 [REFRESH] Current time:', now);
+  console.log('🔍 [REFRESH] Session expires at:', sessionExpiresAt);
+  console.log('🔍 [REFRESH] Time until expiry (minutes):', (sessionExpiresAt.getTime() - now.getTime()) / (1000 * 60));
+
+  if (sessionExpiresAt < now) {
+    console.log('❌ [REFRESH] Refresh token expired');
     throw new AppError('Refresh token expired', 401, 'refresh_expired')
   }
 
   // Rotate
+  console.log('🔄 [REFRESH] Starting token rotation');
   const user = await getPublicUserById(session.userId, null)
-  if (!user) throw new AppError('User not found', 404, 'user_not_found')
+  console.log('🔍 [REFRESH] User found:', !!user);
 
+  if (!user) {
+    console.log('❌ [REFRESH] User not found in database');
+    throw new AppError('User not found', 404, 'user_not_found')
+  }
+
+  console.log('🔍 [REFRESH] Generating new access token');
   const accessToken = await generateAccessToken(user)
-  const { token: newToken, hash: newHash, jti: newJti, expiresAt } = await generateRefreshToken()
+  console.log('🔍 [REFRESH] Access token generated successfully');
 
+  console.log('🔍 [REFRESH] Generating new refresh token');
+  const { token: newToken, hash: newHash, jti: newJti, expiresAt } = await generateRefreshToken()
+  console.log('🔍 [REFRESH] New refresh token generated');
+  console.log('🔍 [REFRESH] New token expires at:', expiresAt);
+
+  console.log('🔍 [REFRESH] Creating new session');
   await createSession({
     jti: newJti,
     userId: user.id,
@@ -137,11 +180,17 @@ router.post('/refresh', async (req, res) => {
     ip: req.ip ?? null,
     userAgent: req.headers['user-agent'] ?? null
   })
+  console.log('🔍 [REFRESH] New session created');
 
+  console.log('🔍 [REFRESH] Linking replaced session');
   await linkReplacedSession(session.jti, newJti)
+  console.log('🔍 [REFRESH] Session linked successfully');
 
   // Set rotated cookie
   const { isProdLike, sameSite, domain } = getCookieOptionsBase()
+  console.log('🔍 [REFRESH] Cookie options:', { isProdLike, sameSite, domain });
+  console.log('🔍 [REFRESH] Setting new cookie with maxAge:', Math.max(0, new Date(expiresAt).getTime() - Date.now()));
+
   res.cookie('rtid', newToken, {
     httpOnly: true,
     secure: isProdLike,
@@ -150,8 +199,10 @@ router.post('/refresh', async (req, res) => {
     path: '/api/auth/refresh',
     maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
   })
+  console.log('🔍 [REFRESH] New cookie set successfully');
 
   res.set('Cache-Control', 'no-store')
+  console.log('✅ [REFRESH] Success - returning new access token');
   res.json({ token: accessToken })
 });
 

@@ -33,5 +33,8 @@ export default {
     "event:update": [ "self", "guardian-as-athlete"],
     "event:delete": [ "self", "guardian-as-athlete"],
     "membership:delete": ["self"],
+    "event:attendance:set": ["self", "guardian-as-athlete", "coach-as-athlete"],
+    "event:attendance:read": ["self", "guardian-as-athlete", "coach-as-athlete"],
+    "event:attendance:delete": ["self", "guardian-as-athlete", "coach-as-athlete"],
   }
 } as const;
