@@ -7,8 +7,7 @@ import { MinimalTeamUser } from "@/types/user"
 // --- config ---
 const ISS = process.env["JWT_ISSUER"]!
 const AUD = process.env["JWT_AUDIENCE"]!
-const ACCESS_TTL_SEC = 3 // 15 min // TODO CHANGE THIS SHIT BACK
-// const ACCESS_TTL_SEC = 15 * 60 // 15 min
+const ACCESS_TTL_SEC = 15 * 60 // 15 min
 
 const REFRESH_TTL_SEC = parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 // 90 days
 
