@@ -1,5 +1,9 @@
 export type EVENT_TYPE = 'training' | 'independent' | 'match' | 'mental' | 'other';
 
+export type localizationObject = {
+  [key: string]: string;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -86,8 +90,11 @@ export interface Audio {
 }
 
 export interface EventPlanPartType {
-  title: string;
-  scope: 'software' | 'club' | 'team' | 'athlete';
+  titleObject: string | localizationObject;
+  scope: 'global' | 'club' | 'team' | 'athlete';
+  teamId?: string | null;
+  clubId?: string | null;
+  color: string;
   createdBy: string; // userId of creator
   createdAt: Date;
   updatedAt: Date;

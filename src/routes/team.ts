@@ -508,6 +508,10 @@ router.post('/get-join', async (req: Request, res: Response) => {
   const tokenHash = hashInviteToken(token);
   const [ invite ] = await getTeamUserByTokenHash(tokenHash);
 
+  console.log('token', token);
+  console.log('tokenHash', tokenHash);
+  console.log('invite', invite);
+
   if(!invite || !invite.userId) {
     throw new AppError('Invite not found', 404, 'invalid_invite');
   }
