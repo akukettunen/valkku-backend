@@ -11,15 +11,8 @@ import { generateAccessToken } from '@/utils/tokenHelper';
 const router: Router = Router();
 
 router.get('/me', requireSignedIn, async (req: Request, res: Response) => {
-  console.log('🔍 [USER/ME] Request received');
-  console.log('🔍 [USER/ME] Headers:', req.headers);
-  console.log('🔍 [USER/ME] Cookies:', req.cookies);
-  console.log('🔍 [USER/ME] User from req.user:', req.user);
-  console.log('🔍 [USER/ME] User ID:', req.user?.sub);
-
   try {
     const publicUser = await getPublicUserById(req.user?.sub!, null) as PublicUser;
-    console.log('🔍 [USER/ME] Public user found:', !!publicUser);
 
     if(!publicUser) {
       console.log('❌ [USER/ME] User not found in database');

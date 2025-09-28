@@ -7,8 +7,7 @@ import { MinimalTeamUser } from "@/types/user"
 // --- config ---
 const ISS = process.env["JWT_ISSUER"]!
 const AUD = process.env["JWT_AUDIENCE"]!
-// const ACCESS_TTL_SEC = 15 * 60 // 15 min
-const ACCESS_TTL_SEC = 3 // TODO: CHANGE THIS SHIT BACK
+const ACCESS_TTL_SEC = 15 * 60 // 15 min
 
 const REFRESH_TTL_SEC = parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 // 90 days
 
@@ -36,7 +35,8 @@ export async function generateAccessToken(user: PublicUser): Promise<string> {
       teamId: team.teamId
     })) as MinimalTeamUser[],
     jti,
-    forcePasswordChange: user.forcePasswordChange
+    forcePasswordChange: user.forcePasswordChange,
+    superAdmin: user.superAdmin
   }
 
   const tokenPayload = tokenUser as unknown as JWTPayload;

@@ -13,6 +13,7 @@ import cookieParser from 'cookie-parser';
 import authRoutes from '@/routes/auth';
 import userRoutes from '@/routes/user';
 import teamRoutes from '@/routes/team';
+import eventRoutes from '@/routes/event';
 
 // Load environment variables
 dotenv.config({ quiet: true });
@@ -98,6 +99,7 @@ app.get('/api/status', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/event', eventRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

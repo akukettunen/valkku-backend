@@ -6,6 +6,7 @@ import { PublicTeamUser, TeamUser, TeamUserRole } from "@/types/team"
 import scopes from "@/utils/scopes"
 import { ROLES } from "@/schemas/team";
 import { TokenUser } from "@/types/user";
+import { OBJECT_SCOPE } from "@/types/general";
 
 dotenv.config({ quiet: true });
 
@@ -41,8 +42,43 @@ export async function requireSignedIn(
   }
 }
 
-export function requireScope(scopeString: string, scope: 'individual' | 'team') {
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if(!req.user?.superAdmin || req.user?.superAdmin === undefined || String(req.user?.superAdmin) === 'false') {
+    throw new AppError('Unauthorized', 403, 'unauthorized');
+  }
+  return next();
+}
+
+export function validateBasedOnScope(action: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const { scope } = req.body as { scope?: OBJECT_SCOPE };
+
+    if (!scope) throw new AppError('Scope is required', 400, 'something_went_wrong');
+    if(!action) throw new AppError('Action is required', 400, 'something_went_wrong');
+
+    console.log('scope', scope);
+    console.log('action', action);
+
+    switch (scope) {
+      case 'team':
+        return requireScope(action, 'team')(req, res, next);
+      case 'user':
+        return requireScope(action, 'individual')(req, res, next);
+      case 'club':
+        throw new AppError('Club scope is not supported yet', 403, 'unauthorized');
+      case 'global':
+        return requireSuperAdmin(req, res, next);
+      default:
+        throw new AppError(`Unsupported scope: ${scope}`, 400, 'something_went_wrong');
+    }
+  };
+}
+
+export function requireScope(scopeString: string, scope: 'individual' | 'team' | 'club') {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if(scope === 'club') {
+      throw new AppError('Club scope is not supported yet', 403, 'unauthorized');
+    }
     const teamId = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
     const userId = req.params['userId'] || req.query['userId'] || req.body['userId'];
 

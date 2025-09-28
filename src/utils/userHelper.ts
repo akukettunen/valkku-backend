@@ -50,6 +50,7 @@ export async function getPublicUserById(id: string, currentTeamId: string | null
     pendingDetails: user.pendingDetails,
     emojiClickedCount: user.emojiClickedCount,
     preferredLanguage: user.preferredLanguage,
+    superAdmin: user.superAdmin,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     teams: publicTeams,

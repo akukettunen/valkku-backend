@@ -21,6 +21,7 @@ export interface User {
   emojiClickedCount: number;
   preferredLanguage: PREFERRED_LANGUAGE;
   forcePasswordChange: boolean;
+  superAdmin: boolean;
 }
 
 export interface PublicUser {
@@ -35,13 +36,15 @@ export interface PublicUser {
   preferredLanguage: PREFERRED_LANGUAGE;
   createdAt: Date;
   updatedAt: Date;
+  superAdmin: boolean;
   forcePasswordChange: boolean;
 }
 
 export interface TokenUser {
+  superAdmin?: boolean;
   sub: string,
   teams: MinimalTeamUser[],
-  jti: string
+  jti: string,
   forcePasswordChange: boolean;
 }
 

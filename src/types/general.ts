@@ -1,0 +1,1 @@
+export type OBJECT_SCOPE = 'global' | 'club' | 'team' | 'user';

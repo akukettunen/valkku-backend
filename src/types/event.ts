@@ -1,6 +1,7 @@
 export type EVENT_TYPE = 'training' | 'independent' | 'match' | 'mental' | 'other';
+export type EVENT_PLAN_PART_SCOPE = 'global' | 'club' | 'team' | 'user';
 
-export type localizationObject = {
+export type LocalizationObject = {
   [key: string]: string;
 }
 
@@ -90,8 +91,11 @@ export interface Audio {
 }
 
 export interface EventPlanPartType {
-  titleObject: string | localizationObject;
-  scope: 'global' | 'club' | 'team' | 'athlete';
+  id: string;
+  titleObject: string | LocalizationObject;
+  scope: 'global' | 'club' | 'team' | 'user';
+  position: number;
+  userId?: string | null;
   teamId?: string | null;
   clubId?: string | null;
   color: string;

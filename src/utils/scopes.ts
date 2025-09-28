@@ -26,6 +26,9 @@ export default {
     "team:transfer_ownership": ["owner"],
     "event:create": ["owner", "admin", "coach"],
     "ownership:transfer": ["owner"],
+
+    "plan-part-type:create": ["owner", "admin", "coach"],
+    "plan-part-type:update": ["owner", "admin", "coach", "user"],
   },
   "individual": { // actions regarding ones own stuff
     "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete
@@ -36,5 +39,8 @@ export default {
     "event:attendance:set": ["self", "guardian-as-athlete", "coach-as-athlete"],
     "event:attendance:read": ["self", "guardian-as-athlete", "coach-as-athlete"],
     "event:attendance:delete": ["self", "guardian-as-athlete", "coach-as-athlete"],
+
+    "plan-part-type:create": ["self", "guardian-as-athlete"],
+    "plan-part-type:update": ["self", "guardian-as-athlete"],
   }
 } as const;
