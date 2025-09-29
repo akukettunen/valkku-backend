@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation';
-import { requireSignedIn, requireScope, validateBasedOnScope } from '@/middleware/auth';
+import { requireSignedIn, requireScope, validateBasedOnScope, requireSuperAdmin } from '@/middleware/auth';
 import { AppError } from '@/middleware/errors';
 import { EVENT_PLAN_PART_SCOPE, EventPlanPartType, LocalizationObject } from '@/types/event';
 import { updateEventPlanPartType, deleteEventPlanPartType, getEventPlanPartTypes, getEventPlanPartTypeById, createEventPlanPartType, updateEventPlanPartTypePosition } from '@/db/event';
@@ -18,18 +18,40 @@ const updateEventPlanPartTypePositionsSchema = z.object({
     pos: z.number()
   }))
 });
+router.get('/plan-part-type/global', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  const eventPlanPartTypes = await getEventPlanPartTypes('global', null, null, true);
 
-router.get('/plan-part-type/global', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {
-  const eventPlanPartTypes = await getEventPlanPartTypes('global');
-
-  res.status(200).json(eventPlanPartTypes);
+  res.status(200).json({
+    success: true,
+    message: 'Event plan part types fetched successfully',
+    data: eventPlanPartTypes
+  });
 });
 
-router.put('/plan-part-type/:id', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/plan-part-type/team/:teamId', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {
+  const { teamId } = req.params as { teamId: string, userId: string };
+  const globalTypes = await getEventPlanPartTypes('global', null, null, false);
+  const teamTypes = await getEventPlanPartTypes('team', teamId, null, false);
+  const userTypes = await getEventPlanPartTypes('user', null, req.user?.sub!, false);
+  const eventPlanPartTypes = [ ...globalTypes, ...teamTypes, ...userTypes ]
+
+  res.status(200).json({
+    success: true,
+    message: 'Event plan part types fetched successfully',
+    data: eventPlanPartTypes
+  });
+});
+
+router.put('/plan-part-type/:id', requireSignedIn, validateBasedOnScope('plan-part-type:update'), async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params as { id: string };
-  const { titleObject, color, scope, archived } = req.body as { titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, teamId: string, userId: string, archived: boolean };
-  const eventPlanPartType = await updateEventPlanPartType(id, titleObject, color, scope, archived);
-  res.status(200).json(eventPlanPartType);
+  const { titleObject, color, scope, archived, teamId, userId } = req.body as { titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, teamId: string, userId: string, archived: boolean };
+  console.log(req.body)
+  const eventPlanPartType = await updateEventPlanPartType(id, titleObject, color, scope, archived, teamId || null, userId || null);
+  res.status(200).json({
+    success: true,
+    message: 'Event plan part type updated successfully',
+    data: eventPlanPartType
+  });
 });
 
 router.delete('/plan-part-type/:id', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {

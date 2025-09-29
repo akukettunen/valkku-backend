@@ -29,6 +29,7 @@ export default {
 
     "plan-part-type:create": ["owner", "admin", "coach"],
     "plan-part-type:update": ["owner", "admin", "coach", "user"],
+    "plan-part-type:delete": ["owner", "admin", "coach", "user"],
   },
   "individual": { // actions regarding ones own stuff
     "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete

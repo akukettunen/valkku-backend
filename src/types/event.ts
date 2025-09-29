@@ -102,4 +102,5 @@ export interface EventPlanPartType {
   createdBy: string; // userId of creator
   createdAt: Date;
   updatedAt: Date;
+  archived: boolean;
 }
