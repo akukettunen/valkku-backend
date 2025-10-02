@@ -1,29 +1,48 @@
-export type EVENT_TYPE = 'training' | 'independent' | 'match' | 'mental' | 'other';
 export type EVENT_PLAN_PART_SCOPE = 'global' | 'club' | 'team' | 'user';
-
+export type EVENT_REPEATS = null | 'daily' | 'weekly' | 'monthly';
+export type EVENT_TYPE = 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event';
+export type EVENT_STATUS = 'draft' | 'published' | 'archived';
 export type LocalizationObject = {
   [key: string]: string;
 }
 
 export interface Event {
-  id: string;
-  title: string;
-  notes: string;
-  coachesNotes: string;
-  startTimeUnixMs: number;
-  endTimeUnixMs: number;
-  location: number;
-  type: EVENT_TYPE;
-  repeats: 'daily' | 'weekly' | 'monthly' | null;
+  id: string; // check
+  title: string; // check
+  teamId: string; // check
+  type: EVENT_TYPE; // check
+  status: EVENT_STATUS; // check
+
+  notes: string; // check
+  ownNotes: string; // check
+  coachesNotes: string; // check
+
+  eventDate: string; // format: YYYY-MM-DD (mysql DATE)
+  startTimeUnixSec: number;
+  endTimeUnixSec: number;
+  durationInMinutes: number | null; // for independent and mental events
+  repeats: EVENT_REPEATS;
   repeatsOn: string | null; // '1001010' = every monday, thursday and sunday - only if repeats daily
-  repeatsUntilUnixMs: number | null;
-  status: string;
-  teamId: string;
-  createdBy: string;
-  deletedAt: Date | null;
+  repeatsUntilUnixSec: string | null; // format: YYYY-MM-DD (mysql DATE) - repeats until the end of this date so this day is included in repeat
+
+  locationId: number;
+
+  createdById: string;
+  deleted: boolean;
   createdAt: Date;
   updatedAt: Date;
-  durationInMinutes: number | null; // for independent and mental events
+}
+
+export interface EventSettings {
+  eventId: number;
+  teamId: string;
+  published: boolean;
+  athletesInByDefault: boolean;
+  athletesCanChangeTime: boolean;
+  publishEventPlanToAthletes: boolean;
+  gatherAttendanceInformation: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface EventUserAttendance {

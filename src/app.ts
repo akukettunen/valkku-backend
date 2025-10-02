@@ -14,6 +14,7 @@ import authRoutes from '@/routes/auth';
 import userRoutes from '@/routes/user';
 import teamRoutes from '@/routes/team';
 import eventRoutes from '@/routes/event';
+import locationRoutes from '@/routes/location';
 
 // Load environment variables
 dotenv.config({ quiet: true });
@@ -100,6 +101,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/event', eventRoutes);
+app.use('/api/location', locationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

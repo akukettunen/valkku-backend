@@ -49,6 +49,55 @@ const promisePoolEnd = async () => {
   await pool.end();
 };
 
+// Transaction class for builder pattern
+export class Transaction {
+  private operations: Array<() => Promise<any>> = [];
+  private connection: any = null;
+
+  addTr<T>(operation: (tr: Transaction) => Promise<T>): Transaction {
+    this.operations.push(async () => {
+      return await operation(this);
+    });
+    return this;
+  }
+
+  async execute(): Promise<any[]> {
+    this.connection = await pool.getConnection();
+
+    try {
+      await this.connection.beginTransaction();
+
+      const results = [];
+      for (const operation of this.operations) {
+        const result = await operation();
+        results.push(result);
+      }
+
+      await this.connection.commit();
+      return results;
+    } catch (error) {
+      await this.connection.rollback();
+      throw error;
+    } finally {
+      this.connection.release();
+    }
+  }
+
+  // Internal query method for operations
+  async query(sql: string, values?: any[]): Promise<any> {
+    if (!this.connection) {
+      throw new Error('Transaction not started. Call execute() first.');
+    }
+    const [rows] = await this.connection.execute(sql, values);
+    return rows;
+  }
+}
+
+// Transaction interface for operations
+export interface Transaction {
+  query(sql: string, values?: any[]): Promise<any>;
+}
+
 export {
   query,
   promisePoolEnd,

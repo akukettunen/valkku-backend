@@ -3,13 +3,46 @@ import { z } from 'zod';
 import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope, validateBasedOnScope, requireSuperAdmin } from '@/middleware/auth';
 import { AppError } from '@/middleware/errors';
-import { EVENT_PLAN_PART_SCOPE, EventPlanPartType, LocalizationObject } from '@/types/event';
+import { EVENT_PLAN_PART_SCOPE, EventPlanPartType, LocalizationObject, Event } from '@/types/event';
 import { updateEventPlanPartType, deleteEventPlanPartType, getEventPlanPartTypes, getEventPlanPartTypeById, createEventPlanPartType, updateEventPlanPartTypePosition } from '@/db/event';
 import { createEventPlanPartTypeSchema } from '@/schemas/event';
 import { RowDataPacket } from 'mysql2';
 import { OBJECT_SCOPE } from '@/types/general';
+import { Transaction } from '@/db/index';
 
 const router: Router = Router();
+
+router.post('/team/:teamId', requireSignedIn, requireScope('event:create', 'team'), async (req: Request, res: Response) => {
+  const { teamId } = req.params as { teamId: string };
+  const tr = new Transaction();
+  const {
+    title,
+    notes,
+    type,
+    ownNotes,
+    coachesNotes,
+    eventDate,
+    startTimeUnixSec,
+    endTimeUnixSec,
+    locationId,
+    repeats,
+    repeatsOn,
+    repeatsUntilUnixSec,
+    status,
+  } = req.body as Event;
+
+  // tr.addTr(async () => {
+  //   return await createEvent(req.body);
+  // });
+
+  const [ createResult ] = await tr.execute();
+
+  res.status(201).json({
+    success: true,
+    message: 'Event created successfully',
+    data: 'ok!'
+  });
+})
 
 const updateEventPlanPartTypePositionsSchema = z.object({
   scope: z.enum([ 'global', 'club', 'team', 'user' ]),
