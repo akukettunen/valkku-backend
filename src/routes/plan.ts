@@ -89,10 +89,11 @@ router.post('/', requireSignedIn, validate(createPlanSchema), validateBasedOnSco
     }
   });
 
-  const [ planInsertData ] = await tr.execute();
+  const [ deleteData, insertData ] = await tr.execute();
 
-  const plan = await getPlanById(planInsertData.insertId);
-  console.log(plan);
+  const plan = await getPlanById(insertData.insertId);
+
+  console.log('PLAN', plan);
 
   res.status(201).json({
     success: true,
