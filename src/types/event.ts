@@ -1,3 +1,6 @@
+import { Location } from "@/routes/location";
+import { OBJECT_SCOPE } from "./general";
+
 export type EVENT_PLAN_PART_SCOPE = 'global' | 'club' | 'team' | 'user';
 export type EVENT_REPEATS = null | 'daily' | 'weekly' | 'monthly';
 export type EVENT_TYPE = 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event';
@@ -9,7 +12,8 @@ export type LocalizationObject = {
 export interface Event {
   id: string; // check
   title: string; // check
-  teamId: string; // check
+  teamId?: string | null; // check
+  userId?: string | null; // check
   type: EVENT_TYPE; // check
   status: EVENT_STATUS; // check
 
@@ -31,6 +35,13 @@ export interface Event {
   deleted: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type PublicEvent = Omit<Event, 'ownNotes' | 'coachesNotes'> & {
+  ownNotes?: string;
+  coachesNotes?: string;
+  location?: Location | null;
+  createdByName?: string;
 }
 
 export interface EventSettings {
@@ -55,45 +66,60 @@ export interface EventUserAttendance {
   updatedAt: Date;
 }
 
-export interface EventSettings {
-  eventId: number;
-  athleteCanModifyTime: boolean;
-}
-
-export interface EventPlan {
+export interface Plan {
   id: string;
-  eventId: number;
-  copyOfPlanId: number;
+  title: string | null;
+  description: string | null;
+  scope: OBJECT_SCOPE;
+  teamId: string;
+  eventId?: number | null;
+  copyOfPlanId?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface EventPlanPart {
+export interface PlanPart {
+  id: string;
+  planId: number;
+  position: number;
   durationInMinutes?: number | null;
   typeId?: number | null;
   createdAt: Date;
   updatedAt: Date;
+  items: PlanPartItem[];
+  nodeType?: 'part';
+  type?: PlanPartType | null | undefined;
 }
 
-export interface EventPlanPartItem {
-  partId: number; // can be atached to part or staraight into event
-  type: 'audio' | 'video' | 'text' | 'image' | 'file' | 'rest'; // movement
+export interface PlanPartItem {
+  id: string;
   eventId: number;
+  partId: string; // can be atached to part or staraight into event
+  planId: number;
+  type: 'audio' | 'video' | 'text' | 'image' | 'file' | 'rest'; // movement
   position: number; // either in part or in event
+  createdAt: Date;
+  updatedAt: Date;
+  item: PlanPartItemText;
+}
+
+export interface PlanPartItemText {
+  planPartItemId: string;
+  text: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 // own type for all EventPlanPartItem types
 // example for rest
-export interface EventPlanPartItemRest {
+export interface PlanPartItemRest {
   eventPlanPartItemId: number;
   timeInSeconds: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface EventPlanPartItemAudio {
+export interface PlanPartItemAudio {
   eventPlanPartItemId: number;
   voiceId: number;
   createdAt: Date;
@@ -109,7 +135,7 @@ export interface Audio {
   updatedAt: Date;
 }
 
-export interface EventPlanPartType {
+export interface PlanPartType {
   id: string;
   titleObject: string | LocalizationObject;
   scope: 'global' | 'club' | 'team' | 'user';

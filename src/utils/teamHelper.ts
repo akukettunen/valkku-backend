@@ -3,12 +3,14 @@ import { query } from '@/db/index';
 import { hashInviteToken } from '@/utils/tokenHelper';
 import { TeamUser, TeamUserRole } from '@/types/team';
 import { NORMAL_ROLES } from '@/schemas/team';
-import { getUserByEmail } from '@/db/user';
+import { getUserByEmail, getUserById } from '@/db/user';
 import { PublicUser, User } from '@/types/user';
 import { getUserTeam, getUserTeamRole } from '@/db/user';
 import { PREFERRED_LANGUAGE } from '@/types/user';
 import { getPublicUserById } from './userHelper';
-import { getTeamUserRoles } from '@/db/team';
+import { getTeamById, getTeamUserRoles } from '@/db/team';
+import { sendTeamInvitationEmail } from '@/utils/emailHelper';
+import { AppError } from '@/middleware/errors';
 
 export const userCanBeInvited = async (
   email: string,
@@ -83,7 +85,7 @@ export const userCanBeInvited = async (
  * @param teamId - The ID of the team to invite the user to
  * @param invitedBy - The ID of the user who invited the user
  */
-export const inviteUserToTeam = async (userId: string, teamId: string, invitedBy: string) => {
+export const inviteUserToTeamAndSendEmail = async (userId: string, teamId: string, invitedBy: string, role: NORMAL_ROLES) => {
   const token = crypto.randomBytes(64).toString("base64url")
   const tokenHash = hashInviteToken(token)
   const validUntil = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
@@ -93,5 +95,13 @@ export const inviteUserToTeam = async (userId: string, teamId: string, invitedBy
     INSERT INTO team_users (teamId, userId, invitedBy, validUntil, status, tokenHash) VALUES (?, ?, ?, ?, ?, ?)
   `, [teamId, userId, invitedBy, validUntil, 'invited', tokenHash])
 
-  // TODO: add email send to outbox table and implement email sending
+  const [ invitedUser ] = await getUserById(userId);
+  const [ invitor ] = await getUserById(invitedBy)
+  const [ team ] = await getTeamById(teamId)
+
+  if(!invitedUser || !invitor || !team) {
+    throw new AppError('User or team not found', 404, 'user_or_team_not_found');
+  }
+
+  await sendTeamInvitationEmail(invitedUser.email, team.name, invitor.fullName || '', token, role, invitedUser.firstName || '', invitedUser.preferredLanguage);
 }

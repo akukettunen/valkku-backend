@@ -28,7 +28,8 @@ export async function requireSignedIn(
     const token = authHeader.substring("Bearer ".length).trim()
     const payload = await verifyToken<TokenUser>(token)
 
-    if(payload.forcePasswordChange || payload.forcePasswordChange === undefined) {
+    // Enforce password change only when explicitly true
+    if(payload.forcePasswordChange === true) {
       throw new AppError('Force password change', 401, 'force_password_change');
     }
 
@@ -79,16 +80,17 @@ export function requireScope(scopeString: string, scope: 'individual' | 'team' |
     if(scope === 'club') {
       throw new AppError('Club scope is not supported yet', 403, 'unauthorized');
     }
-    const teamId = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
-    const userId = req.params['userId'] || req.query['userId'] || req.body['userId'];
+
+    let teamId = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
+    let userId = req.params['userId'] || req.query['userId'] || req.body['userId'];
 
     const user = req.user;
     const userTeams = user?.teams;
     const userTeam = userTeams?.find(team => team.teamId === teamId) as PublicTeamUser | undefined;
-    if (!userTeam) {
+    if (!userTeam && scope === 'team') {
       throw new AppError('Team not found', 404, 'team_not_found');
     }
-    const roles = userTeam.roles as TeamUserRole[];
+    const roles = userTeam?.roles as TeamUserRole[];
     const allowedRoles = scopes[scope as keyof typeof scopes][scopeString as keyof (typeof scopes)[keyof typeof scopes]] as readonly (ROLES | 'guardian-as-athlete' | 'self')[];
 
     let allowed = false;

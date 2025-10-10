@@ -12,9 +12,10 @@ import { inviteUserSchema } from '@/schemas/team';
 import { AppError } from '@/middleware/errors';
 import { hashInviteToken } from '@/utils/tokenHelper';
 import { generateAccessToken } from '@/utils/tokenHelper';
-import { inviteUserToTeam, userCanBeInvited } from '@/utils/teamHelper';
+import { inviteUserToTeamAndSendEmail, userCanBeInvited } from '@/utils/teamHelper';
 import { createId } from '@/utils/userHelper';
 import { hashPassword } from '@/utils/authHelper';
+import { sendTeamAddedEmail } from '@/utils/emailHelper';
 
 const router: Router = Router();
 
@@ -95,8 +96,7 @@ const addTeamUserRoleSchema = z.object({
   path: ['guardianOf']
 });
 
-router.post(
-  '/:teamId/user/:userId/role',
+router.post('/:teamId/user/:userId/role',
   requireSignedIn,
   requireScope('membership:create', 'team'),
   validate(addTeamUserRoleSchema),
@@ -204,9 +204,11 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
   let invitedUserId: string | null = null;
   const mainInviteCheck = await userCanBeInvited(email, teamId, role, guardianOf);
 
+  let mainUserExistedAlready = false
   if (role === 'guardian') {
     // For guardians: allow existing users without sending an invite.
     if (!mainInviteCheck.userToBeCreated) {
+      mainUserExistedAlready = true;
       const existingGuardianId = mainInviteCheck.publicUser!.id;
       // Guardian cannot be the same person as the guardee
       if (guardianOf && existingGuardianId === guardianOf) {
@@ -228,11 +230,16 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 
       await createTeamUserRole(teamId, existingGuardianId, 'guardian', guardianOf);
       invitedUserId = existingGuardianId; // For consistency, though guardians array handling is skipped when role === 'guardian'
+      const [ existingGuardian ] = await getUserById(invitedUserId) as User[];
+      if(!existingGuardian) {
+        throw new AppError('User not found', 404, 'user_not_found');
+      }
+      await sendTeamAddedEmail(existingGuardian.email, team.name, 'guardian', existingGuardian.firstName, existingGuardian.preferredLanguage || preferredLanguage);
     } else {
       // New guardian user: create and invite
       invitedUserId = createId();
       await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
-      await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+      await inviteUserToTeamAndSendEmail(invitedUserId, teamId, req.user?.sub!, 'guardian');
       await createTeamUserRole(teamId, invitedUserId, 'guardian', guardianOf);
     }
   } else {
@@ -245,14 +252,21 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
       await createUser({ id: invitedUserId, email, firstName, lastName, passwordHash: null, preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
     } else {
       invitedUserId = mainInviteCheck.publicUser?.id!;
+      mainUserExistedAlready = true;
     }
     if(mainInviteCheck.userTeamToBeCreated) {
       if(mainInviteCheck.userToBeCreated) {
         // New user - send invite
-        await inviteUserToTeam(invitedUserId, teamId, req.user?.sub!);
+        await inviteUserToTeamAndSendEmail(invitedUserId, teamId, req.user?.sub!, role);
       } else {
         // Existing user - add directly with active status
+        const [ existingUser ] = await getUserById(invitedUserId) as User[];
+        if(!existingUser) {
+          throw new AppError('User not found', 404, 'user_not_found');
+        }
+        await sendTeamAddedEmail(existingUser.email, team.name, role, existingUser.firstName, existingUser.preferredLanguage || preferredLanguage);
         await createTeamUser(teamId, invitedUserId, 'active');
+        mainUserExistedAlready = true;
       }
     }
     await createTeamUserRole(teamId, invitedUserId, role, guardianOf);
@@ -272,7 +286,7 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
 
         const [membership] = await getTeamUser(teamId, existingGuardian.id);
         if (!membership) {
-          await createTeamUser(teamId, existingGuardian.id, 'active');
+          await createTeamUser(teamId, existingGuardian.id);
         }
 
         const existingRoles = await getTeamUserRoles(teamId, existingGuardian.id);
@@ -282,13 +296,14 @@ router.post('/:teamId/invite', requireSignedIn, requireScope('membership:create'
         }
 
         await createTeamUserRole(teamId, existingGuardian.id, 'guardian', invitedUserId!);
+        await sendTeamAddedEmail(email, team.name, 'guardian', firstName, existingGuardian.preferredLanguage || preferredLanguage);
         continue;
       }
 
       // Otherwise, create new user, invite to team, and add guardian role
       const guardianUserId = createId();
       await createUser({ id: guardianUserId, email: guardian.email, firstName: guardian.firstName, lastName: guardian.lastName, passwordHash: null, preferredLanguage: guardian.preferredLanguage, forcePasswordChange: true, emailConfirmed: true });
-      await inviteUserToTeam(guardianUserId, teamId, req.user?.sub!);
+      await inviteUserToTeamAndSendEmail(guardianUserId, teamId, req.user?.sub!, 'guardian');
       await createTeamUserRole(teamId, guardianUserId, 'guardian', invitedUserId!);
     }
   }

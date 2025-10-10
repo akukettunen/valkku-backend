@@ -78,7 +78,8 @@ export const getUserTeams = async (userId: string) => {
       team_users.userId,
       team_users.teamId,
       teams.name as teamName,
-      team_users.createdAt
+      team_users.createdAt,
+      team_users.status
     FROM team_users
     LEFT JOIN teams ON team_users.teamId = teams.id
     WHERE team_users.userId = ?;

@@ -24,12 +24,21 @@ export default {
     "membership:read": ["owner", "admin", "coach"],
     "membership:delete": ["owner", "admin"], // owner membership cannot be removed
     "team:transfer_ownership": ["owner"],
+
     "event:create": ["owner", "admin", "coach"],
+    "event:update": ["owner", "admin", "coach"],
+    "event:read": ["owner", "admin", "coach", "athlete", "guardian"],
+
     "ownership:transfer": ["owner"],
 
     "plan-part-type:create": ["owner", "admin", "coach"],
-    "plan-part-type:update": ["owner", "admin", "coach", "user"],
-    "plan-part-type:delete": ["owner", "admin", "coach", "user"],
+    "plan-part-type:update": ["owner", "admin", "coach"],
+    "plan-part-type:delete": ["owner", "admin", "coach"],
+
+    "plan:post": ["owner", "admin", "coach"],
+    "plan:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "plan:update": ["owner", "admin", "coach"],
+    "plan:delete": ["owner", "admin", "coach"],
 
     "location:create": ["owner", "admin"],
     "location:read": ["owner", "admin", "athlete", "guardian", "coach"],
@@ -48,5 +57,10 @@ export default {
 
     "plan-part-type:create": ["self", "guardian-as-athlete"],
     "plan-part-type:update": ["self", "guardian-as-athlete"],
+
+    "plan:post": ["self", "guardian-as-athlete"],
+    "plan:read": ["self", "guardian-as-athlete"],
+    "plan:update": ["self", "guardian-as-athlete"],
+    "plan:delete": ["self", "guardian-as-athlete"],
   }
 } as const;

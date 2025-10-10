@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { signupSchema, loginSchema, changePasswordSchema } from "@/schemas/auth";
 import { validate } from "@/middleware/validation";
-import { createUser, getUserByEmail, getUserById, revokeSession, updateUserPassword } from "@/db/user";
+import { createUser, getUserByEmail, getUserById, updateUserPassword, getUserTeams } from "@/db/user";
 import { User } from "@/types/user";
 import { getPublicUserById } from "@/utils/userHelper";
 const router: Router = Router();
@@ -16,13 +16,13 @@ import {
   linkReplacedSession
 } from '@/db/session'
 import { createId } from '@/utils/userHelper';
-
+import { sendWelcomeEmail } from "@/utils/emailHelper";
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   const [ user ] = await getUserByEmail(email) as User[];
-  console.log('user', user);
+
   const candidateHash = user?.passwordHash ?? '$argon2id$v=19$m=65536,t=3,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
   const isPasswordValid = await verifyPassword(candidateHash, password);
 
@@ -47,7 +47,6 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
     userAgent: req.headers['user-agent'] ?? null
   })
 
-
   attachRefreshCookie(res, token, expiresAt)
 
   return res.status(200).json({
@@ -65,8 +64,20 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
   const { firstName, lastName, email, password, repeatPassword, preferredLanguage } = req.body;
 
   const [ existingUser ] = await getUserByEmail(email) as User[];
+
+  console.log('existingUser', existingUser);
+
   if(existingUser) {
-    throw new AppError('User already exists', 400, 'user_already_exists');
+    const userTeams = await getUserTeams(existingUser.id);
+    let invited = userTeams.length > 0;
+    userTeams.forEach(team => {
+      if(team.status !== 'invited') {
+        invited = false;
+      }
+    })
+
+    if(!invited) throw new AppError('User already exists', 400, 'user_already_exists');
+    else throw new AppError('User already invited', 400, 'user_already_invited');
   }
 
   if(password !== repeatPassword) {
@@ -75,6 +86,8 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 
   const passwordHash = await hashPassword(password);
   await createUser({ id: createId(), email, passwordHash, firstName, lastName, preferredLanguage, forcePasswordChange: false, emailConfirmed: false }) as any;
+
+  await sendWelcomeEmail(email, firstName, preferredLanguage);
 
   return res.status(201).json({
     success: true,

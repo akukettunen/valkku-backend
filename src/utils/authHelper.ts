@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import argon2 from "argon2"
 dotenv.config({ quiet: true });
+import { TokenUser } from '@/types/user';
+import { ROLES } from '@/schemas/team';
 
 // Create hash
 export async function hashPassword(plain: string) {
@@ -41,4 +43,12 @@ export async function getMgmtToken(): Promise<string> {
   const { access_token, expires_in } = await resp.json() as { access_token: string; expires_in: number };
   mgmtCache = { token: access_token, exp: now + expires_in };
   return access_token;
+}
+
+export function hasRoleInTeam(user: TokenUser, teamId: string, rolesArray: ROLES[]) {
+  const userTeam = user.teams.find(team => team.teamId === teamId);
+
+  if(!userTeam) return false;
+
+  return userTeam.roles.some(role => rolesArray.includes(role.role));
 }

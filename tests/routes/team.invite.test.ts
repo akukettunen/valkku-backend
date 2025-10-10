@@ -28,12 +28,18 @@ vi.mock('@/db/user', () => ({
 // Mock helpers related to invites
 vi.mock('@/utils/teamHelper', () => ({
   userCanBeInvited: vi.fn(),
-  inviteUserToTeam: vi.fn(),
+  inviteUserToTeamAndSendEmail: vi.fn(),
+}))
+
+vi.mock('@/utils/emailHelper', () => ({
+  sendTeamInvitationEmail: vi.fn(),
+  sendTeamAddedEmail: vi.fn(),
 }))
 
 import { getTeamById, getTeamUser, getTeamUserRoles, createTeamUser, createTeamUserRole } from '@/db/team'
+import { sendTeamAddedEmail } from '@/utils/emailHelper'
 import { getUserByEmail, createUser } from '@/db/user'
-import { userCanBeInvited, inviteUserToTeam } from '@/utils/teamHelper'
+import { userCanBeInvited, inviteUserToTeamAndSendEmail } from '@/utils/teamHelper'
 
 const TEAM_ID = 'team123'
 
@@ -65,7 +71,7 @@ describe('POST /api/team/:teamId/invite', () => {
     // createUser called once with provided email
     expect(createUser).toHaveBeenCalledTimes(1)
     const createdId = vi.mocked(createUser).mock.calls[0][0].id
-    expect(vi.mocked(inviteUserToTeam)).toHaveBeenCalledWith(createdId, TEAM_ID, 'inviter123')
+    expect(vi.mocked(inviteUserToTeamAndSendEmail)).toHaveBeenCalledWith(createdId, TEAM_ID, 'inviter123')
     expect(vi.mocked(createTeamUserRole)).toHaveBeenCalledWith(TEAM_ID, createdId, 'athlete', undefined)
   })
 
@@ -83,7 +89,7 @@ describe('POST /api/team/:teamId/invite', () => {
 
     expect(res.status).toBe(201)
     expect(createUser).not.toHaveBeenCalled()
-    expect(inviteUserToTeam).toHaveBeenCalledWith('u1', TEAM_ID, 'inviter123')
+    expect(inviteUserToTeamAndSendEmail).toHaveBeenCalledWith('u1', TEAM_ID, 'inviter123')
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, 'u1', 'coach', undefined)
   })
 
@@ -102,7 +108,7 @@ describe('POST /api/team/:teamId/invite', () => {
     expect(res.status).toBe(400)
     expect(res.body.code).toBe('user_already_invited_to_team_with_role')
     expect(createUser).not.toHaveBeenCalled()
-    expect(inviteUserToTeam).not.toHaveBeenCalled()
+    expect(inviteUserToTeamAndSendEmail).not.toHaveBeenCalled()
     expect(createTeamUserRole).not.toHaveBeenCalled()
   })
 
@@ -124,7 +130,8 @@ describe('POST /api/team/:teamId/invite', () => {
 
     expect(res.status).toBe(201)
     expect(createTeamUser).toHaveBeenCalledWith(TEAM_ID, 'g1')
-    expect(inviteUserToTeam).not.toHaveBeenCalled()
+    expect(sendTeamAddedEmail).toHaveBeenCalledWith('guardian@example.com', 'Team', 'guardian', 'Guardian', 'en')
+    expect(inviteUserToTeamAndSendEmail).not.toHaveBeenCalled()
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, 'g1', 'guardian', 'ath1')
   })
 
@@ -206,7 +213,7 @@ describe('POST /api/team/:teamId/invite', () => {
     // g2 (new): create + invite + role
     const createdG2Id = vi.mocked(createUser).mock.calls.find(([args]) => args.email === 'g2@example.com')?.[0]?.id
     expect(createdG2Id).toBeTruthy()
-    expect(inviteUserToTeam).toHaveBeenCalledWith(createdG2Id, TEAM_ID, 'inviter123')
+    expect(inviteUserToTeamAndSendEmail).toHaveBeenCalledWith(createdG2Id, TEAM_ID, 'inviter123')
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, createdG2Id, 'guardian', 'ath1')
   })
 
