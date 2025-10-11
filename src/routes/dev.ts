@@ -1,8 +1,9 @@
+import type { Router as ExpressRouter } from 'express';
 import { Router, Request, Response } from 'express';
 import { getTranslations, Language } from '@/locales/emailTranslations';
 import { renderEmailTemplate, htmlToPlainText } from '@/utils/templateEngine';
 
-const router = Router();
+const router: ExpressRouter = Router();
 const LOGO_URL = process.env['EMAIL_LOGO_URL'] || 'https://tiimio-assets.s3.eu-west-1.amazonaws.com/valkku_logo.svg';
 
 // GET /api/dev/email-preview?type=welcome&lang=en
