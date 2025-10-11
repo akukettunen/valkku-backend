@@ -1,15 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
-import { getEventsByTeamId } from '@/db/event';
+import { getEventsByTeamIdRange, getEventsByTeamIdDate } from '@/db/event';
 import { Transaction } from '@/db/index';
 import { createEvent, getEventById } from '@/db/event';
 import { createEventSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
 import { query } from '@/db/index';
-import { Event, PublicEvent } from '@/types/event';
+import { Event, Plan, PublicEvent } from '@/types/event';
 import { Location } from './location';
 import { hasRoleInTeam } from '@/utils/authHelper';
+import { getPlanByEventId } from '@/utils/planHelper';
 
 const router: Router = Router();
 
@@ -62,9 +63,31 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
 router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { teamId } = req.params as { teamId: string };
-  const { startDate, endDate } = req.query as { startDate: string, endDate: string };
+  const { startDate, endDate, date, withPlans } = req.query as { startDate: string, endDate: string, date: string, withPlans: 'true' | 'false' };
 
-  const events = await getEventsByTeamId(teamId, startDate, endDate);
+  let events: PublicEvent[];
+  if(date) {
+    events = await getEventsByTeamIdDate(teamId, date) as Event[];
+  } else {
+    events = await getEventsByTeamIdRange(teamId, startDate, endDate) as Event[];
+  }
+
+  for(const event of events) {
+    if(event.createdById !== req.user?.sub) {
+      delete event.ownNotes;
+    }
+    if(!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
+      delete event.coachesNotes;
+    }
+  }
+
+  if(withPlans === 'true') {
+    for (const event of events) {
+      console.log('event.id', event.id);
+      event.plan = await getPlanByEventId(event.id, teamId);
+      console.log('event.plan', event.plan);
+    }
+  }
 
   res.status(200).json({
     success: true,

@@ -48,7 +48,21 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
   return result;
 };
 
-export const getEventsByTeamId = async (teamId: string, startDate: string, endDate: string) => {
+export const getEventsByTeamIdDate = async (teamId: string, date: string) => {
+  const result = await query(`
+    SELECT
+      events.*,
+      addedBy.fullName as addedByName,
+      addedBy.email as addedByEmail,
+      addedBy.id as addedById
+    FROM events
+    LEFT JOIN users as addedBy ON events.createdById = addedBy.id
+    WHERE teamId = ? AND eventDate = ?
+  `, [teamId, date]);
+  return result as Event[];
+};
+
+export const getEventsByTeamIdRange = async (teamId: string, startDate: string, endDate: string) => {
   const result = await query(`
     SELECT
       events.*,

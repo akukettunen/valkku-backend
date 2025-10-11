@@ -103,8 +103,8 @@ router.post('/', requireSignedIn, validate(createPlanSchema), validateBasedOnSco
 
 router.get('/event/:eventId/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { eventId, teamId } = req.params as { eventId: string, teamId: string };
-  console.log('Event ID', eventId);
-  const plan = await getPlanByEventId(eventId, teamId);
+  const eventIdNumber = parseInt(eventId);
+  const plan = await getPlanByEventId(eventIdNumber, teamId);
 
   res.status(200).json({
     success: true,

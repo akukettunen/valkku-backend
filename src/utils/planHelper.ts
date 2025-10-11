@@ -1,13 +1,17 @@
 import { query } from "@/db";
 import { Plan, PlanPart, PlanPartItem, PlanPartItemText, PlanPartType } from "@/types/event";
 
-export const getPlanByEventId = async (eventId: string, teamId?: string) => {
+export const getPlanByEventId = async (eventId: number, teamId?: string) => {
   let fetchedPlan;
+  console.log('teamId', teamId);
+  console.log('eventId', eventId);
   if(teamId) {
-    fetchedPlan = await query(`SELECT * FROM plans WHERE eventId = ? AND teamId = ?`, [eventId, teamId]) as Plan[];
+    fetchedPlan = await query(`SELECT id FROM plans WHERE eventId = ? AND teamId = ?`, [eventId, teamId]) as Plan[];
   } else {
-    fetchedPlan = await query(`SELECT * FROM plans WHERE eventId = ?`, [eventId]) as Plan[];
+    fetchedPlan = await query(`SELECT id FROM plans WHERE eventId = ?`, [eventId]) as Plan[];
   }
+
+  console.log('fetchedPlan', fetchedPlan);
 
   if(!fetchedPlan[0]) {
     return null;

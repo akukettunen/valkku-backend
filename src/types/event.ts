@@ -10,7 +10,7 @@ export type LocalizationObject = {
 }
 
 export interface Event {
-  id: string; // check
+  id: number; // check
   title: string; // check
   teamId?: string | null; // check
   userId?: string | null; // check
@@ -41,6 +41,7 @@ export type PublicEvent = Omit<Event, 'ownNotes' | 'coachesNotes'> & {
   ownNotes?: string;
   coachesNotes?: string;
   location?: Location | null;
+  plan?: Plan | null;
   createdByName?: string;
 }
 
