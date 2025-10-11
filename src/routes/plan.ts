@@ -8,9 +8,8 @@ import { OBJECT_SCOPE } from '@/types/general';
 import { EVENT_PLAN_PART_SCOPE, PlanPartType, LocalizationObject, Plan, PlanPartItem, PlanPart } from '@/types/event';
 import { RowDataPacket } from 'mysql2';
 import { updatePlanPartType, deletePlanPartType, getPlanPartTypes, getPlanPartTypeById, createPlanPartType, updatePlanPartTypePosition } from '@/db/event';
-import { TeamUserRole } from '@/types/team';
 import { createPlanSchema } from '@/schemas/plan';
-import { query, Transaction } from '@/db/index';
+import { Transaction } from '@/db/index';
 import { getPlanById, getPlanByEventId } from '@/utils/planHelper';
 import { requireScope } from '@/middleware/auth';
 
@@ -159,10 +158,17 @@ router.get('/plan-part-type/me', requireSignedIn, async (req: Request, res: Resp
 
 router.put('/plan-part-type/:id', requireSignedIn, validateBasedOnScope('plan-part-type:update'), async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params as { id: string };
-  const { titleObject, color, scope, archived, teamId, userId } = req.body as { titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, teamId: string, userId: string, archived: boolean };
+  let { titleObject, color, scope, archived, teamId, userId } = req.body as { titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, teamId: string | null | undefined, userId: string | null | undefined, archived: boolean };
+
+  if(scope === 'team') {
+    userId = null;
+  } else if(scope === 'user') {
+    teamId = null;
+  }
 
   await updatePlanPartType(id, titleObject, color, scope, archived, teamId || null, userId || null);
   const [ eventPlanPartType ] = await getPlanPartTypeById(id) as PlanPartType[];
+  console.log('eventPlanPartType', eventPlanPartType);
   res.status(200).json({
     success: true,
     message: 'Event plan part type updated successfully',

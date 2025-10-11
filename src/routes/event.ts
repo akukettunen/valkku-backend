@@ -22,12 +22,14 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
     return await createEvent({...req.body, teamId}, req.user?.sub!, trx);
   });
 
-  await tr.execute();
+  const [ eventCreateData ] = await tr.execute();
+  const id = eventCreateData.insertId;
+  const [ event ] = await getEventById(id) as PublicEvent[];
 
   res.status(201).json({
     success: true,
     message: 'Event created successfully',
-    data: 'ok!'
+    data: event
   });
 })
 

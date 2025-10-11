@@ -91,8 +91,6 @@ export const deletePlanPartType = async (id: string) => {
 };
 
 export const updatePlanPartType = async (id: string, titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, archived: boolean = false, teamId?: string | null, userId?: string | null) => {
-  // we auth against scope teamId and userId
-
   const result = await query(`
     UPDATE plan_part_types
     SET titleObject = ?, color = ?, archived = ?
