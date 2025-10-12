@@ -24,7 +24,7 @@ export interface User {
   superAdmin: boolean;
 }
 
-export interface PublicUser {
+export interface PublicUserSelf {
   id: string;
   email: string;
   status: USER_STATUS;
@@ -38,6 +38,13 @@ export interface PublicUser {
   updatedAt: Date;
   superAdmin: boolean;
   forcePasswordChange: boolean;
+}
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
 }
 
 export interface TokenUser {

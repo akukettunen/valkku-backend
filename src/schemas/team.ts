@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { nameSchema, emailSchema, normalRoleSchema, preferredLanguageSchema } from '@/schemas/common';
 
-export type ROLES = 'owner' | 'admin' | 'coach' | 'athlete' | 'guardian';
-// ROLES exclude owner
-export type NORMAL_ROLES = 'admin' | 'coach' | 'athlete' | 'guardian';
-
 export const createTeamSchema = z.object({
   name: nameSchema
 });

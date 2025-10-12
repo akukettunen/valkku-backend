@@ -2,12 +2,12 @@ import crypto from 'crypto';
 import { query } from '@/db/index';
 import { hashInviteToken } from '@/utils/tokenHelper';
 import { TeamUser, TeamUserRole } from '@/types/team';
-import { NORMAL_ROLES } from '@/schemas/team';
+import { NORMAL_ROLES } from '@/types/team';
 import { getUserByEmail, getUserById } from '@/db/user';
 import { PublicUser, User } from '@/types/user';
 import { getUserTeam, getUserTeamRole } from '@/db/user';
 import { PREFERRED_LANGUAGE } from '@/types/user';
-import { getPublicUserById } from './userHelper';
+import { getPublicUserSelfById } from './userHelper';
 import { getTeamById, getTeamUserRoles } from '@/db/team';
 import { sendTeamInvitationEmail } from '@/utils/emailHelper';
 import { AppError } from '@/middleware/errors';
@@ -50,7 +50,7 @@ export const userCanBeInvited = async (
     }
   }
 
-  const publicUser = await getPublicUserById(user.id, null) as PublicUser;
+  const publicUser = await getPublicUserSelfById(user.id, null) as PublicUser;
   const [ userTeam ] = await getUserTeam(user.id, teamId) as TeamUser[];
   if(!userTeam) {
     return {

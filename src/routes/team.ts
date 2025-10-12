@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation';
-import { createTeamSchema, NORMAL_ROLES, ROLES } from '@/schemas/team';
+import { createTeamSchema } from '@/schemas/team';
+import { NORMAL_ROLES, ROLES } from '@/types/team';
 import { createTeam, createTeamUser, createTeamUserRole, deleteTeamUserRolesForUser, deleteTeamUser, getTeamById, getTeamTeamUserRoles, deleteTeamUserRole, getTeamUserRolesForGuardian, getTeamUserByTokenHash, setUserTeamActive } from '@/db/team';
 import { getUserById, getUserByEmail, createUser, deleteUser, updateUserPassword, updateUserDetails, setForcePasswordChange } from '@/db/user';
-import { PREFERRED_LANGUAGE, PublicUser, User, UserInTeam } from '@/types/user';
+import { PREFERRED_LANGUAGE, PublicUser, PublicUserSelf, User, UserInTeam } from '@/types/user';
 import { getTeamUsers, getTeamUser, getTeamUserRoles } from '@/db/team';
-import { getPublicUserById } from '@/utils/userHelper';
+import { getPublicUserSelfById } from '@/utils/userHelper';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { inviteUserSchema } from '@/schemas/team';
 import { AppError } from '@/middleware/errors';
@@ -24,7 +25,7 @@ router.post('/', requireSignedIn, validate(createTeamSchema), async (req: Reques
 
   const newTeamId = createId();
   await createTeam({ id: newTeamId, name });
-  const [ user ] = await getUserById(req.user?.sub!) as User[];
+  const [ user ] = await getUserById(req.user?.sub!);
   const [ team ] = await getTeamById(newTeamId);
 
   if(!user) {
@@ -38,7 +39,11 @@ router.post('/', requireSignedIn, validate(createTeamSchema), async (req: Reques
   await createTeamUser(newTeamId, user.id);
   await createTeamUserRole(newTeamId, user.id, 'owner');
 
-  const publicUser = await getPublicUserById(req.user?.sub!, null) as PublicUser;
+  const publicUser = await getPublicUserSelfById(req.user?.sub!, null);
+  if(!publicUser) {
+    throw new AppError('User not found', 404, 'something_went_wrong');
+  }
+
   const accessToken = await generateAccessToken(publicUser)
 
   return res.status(201).json({

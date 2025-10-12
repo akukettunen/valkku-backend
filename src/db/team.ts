@@ -1,8 +1,8 @@
 import { query } from '@/db/index';
-import { ROLES } from '@/schemas/team';
 import { UserInTeam } from '@/types/user';
 import { Team, TeamUserRole } from '@/types/team';
 import { TeamUser } from '@/types/team';
+import { ROLES, NORMAL_ROLES } from '@/types/team';
 
 export const createTeam = async ({ id, name }: { id: string, name: string}) => {
   return query(`

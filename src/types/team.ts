@@ -1,5 +1,7 @@
-import { ROLES, NORMAL_ROLES } from "@/schemas/team";
 import { USER_STATUS } from "@/types/user";
+
+export type ROLES = 'owner' | 'admin' | 'coach' | 'athlete' | 'guardian';
+export type NORMAL_ROLES = 'admin' | 'coach' | 'athlete' | 'guardian';
 
 export interface Team {
   id: string;

@@ -2,7 +2,7 @@ import { query } from '@/db/index';
 import { TeamUser, TeamUserRole } from '@/types/team';
 import { PREFERRED_LANGUAGE, User } from '@/types/user';
 import { AppError } from '@/middleware/errors';
-import { ROLES } from '@/schemas/team';
+import { ROLES } from '@/types/team';
 
 export const putUserDetails = async (user: { firstName: string; lastName: string }) => {
   const { firstName, lastName } = user;

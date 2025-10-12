@@ -35,6 +35,8 @@ export default {
     "plan-part-type:update": ["owner", "admin", "coach"],
     "plan-part-type:delete": ["owner", "admin", "coach"],
 
+    "user:read": ["owner", "admin", "coach"],
+
     "plan:post": ["owner", "admin", "coach"],
     "plan:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "plan:update": ["owner", "admin", "coach"],
@@ -62,5 +64,7 @@ export default {
     "plan:read": ["self", "guardian-as-athlete"],
     "plan:update": ["self", "guardian-as-athlete"],
     "plan:delete": ["self", "guardian-as-athlete"],
+
+    "user:read": ["self", "guardian-as-athlete"],
   }
 } as const;

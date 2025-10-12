@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import argon2 from "argon2"
 dotenv.config({ quiet: true });
 import { TokenUser } from '@/types/user';
-import { ROLES } from '@/schemas/team';
+import { ROLES } from '@/types/team';
 
 // Create hash
 export async function hashPassword(plain: string) {

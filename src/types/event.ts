@@ -150,3 +150,10 @@ export interface PlanPartType {
   updatedAt: Date;
   archived: boolean;
 }
+
+export interface EventAthlete {
+  eventId: number;
+  athleteId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

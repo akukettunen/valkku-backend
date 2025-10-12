@@ -1,5 +1,5 @@
 import type { Language } from '@/locales/emailTranslations';
-import type { ROLES } from '@/schemas/team';
+import type { ROLES } from '@/types/team';
 
 const ROLE_LABELS: Record<Language, Record<ROLES, string>> = {
   en: {

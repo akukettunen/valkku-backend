@@ -3,7 +3,7 @@ import { signupSchema, loginSchema, changePasswordSchema } from "@/schemas/auth"
 import { validate } from "@/middleware/validation";
 import { createUser, getUserByEmail, getUserById, updateUserPassword, getUserTeams } from "@/db/user";
 import { User } from "@/types/user";
-import { getPublicUserById } from "@/utils/userHelper";
+import { getPublicUserSelfById } from "@/utils/userHelper";
 const router: Router = Router();
 import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
@@ -21,7 +21,7 @@ import { sendWelcomeEmail } from "@/utils/emailHelper";
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const [ user ] = await getUserByEmail(email) as User[];
+  const [ user ] = await getUserByEmail(email);
 
   const candidateHash = user?.passwordHash ?? '$argon2id$v=19$m=65536,t=3,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
   const isPasswordValid = await verifyPassword(candidateHash, password);
@@ -30,7 +30,7 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
     throw new AppError('Password or email is wrong', 401, 'invalid_login_credentials');
   }
 
-  const publicUser = await getPublicUserById(user.id, null);
+  const publicUser = await getPublicUserSelfById(user.id, null);
   if(!publicUser) {
     throw new AppError('Something went wrong', 500, 'something_went_wrong');
   }
@@ -63,9 +63,7 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
 router.post('/signup', validate(signupSchema), async (req: Request, res: Response) => {
   const { firstName, lastName, email, password, repeatPassword, preferredLanguage } = req.body;
 
-  const [ existingUser ] = await getUserByEmail(email) as User[];
-
-  console.log('existingUser', existingUser);
+  const [ existingUser ] = await getUserByEmail(email);
 
   if(existingUser) {
     const userTeams = await getUserTeams(existingUser.id);
@@ -97,13 +95,6 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 });
 
 router.post('/refresh', async (req, res) => {
-  console.log('🔄 [REFRESH] Request received');
-  console.log('🔄 [REFRESH] Headers:', req.headers);
-  console.log('🔄 [REFRESH] Cookies:', req.cookies);
-  console.log('🔄 [REFRESH] User-Agent:', req.headers['user-agent']);
-  console.log('🔄 [REFRESH] IP:', req.ip);
-  console.log('🔄 [REFRESH] Raw cookie value:', req.cookies?.rtid);
-
   const cookie = req.cookies?.rtid
 
   if (!cookie) {
@@ -137,35 +128,23 @@ router.post('/refresh', async (req, res) => {
 
   const now = new Date();
   const sessionExpiresAt = new Date(session.expiresAt);
-  console.log('🔍 [REFRESH] Current time:', now);
-  console.log('🔍 [REFRESH] Session expires at:', sessionExpiresAt);
-  console.log('🔍 [REFRESH] Time until expiry (minutes):', (sessionExpiresAt.getTime() - now.getTime()) / (1000 * 60));
 
   if (sessionExpiresAt < now) {
-    console.log('❌ [REFRESH] Refresh token expired');
     throw new AppError('Refresh token expired', 401, 'refresh_expired')
   }
 
   // Rotate
-  console.log('🔄 [REFRESH] Starting token rotation');
-  const user = await getPublicUserById(session.userId, null)
-  console.log('🔍 [REFRESH] User found:', !!user);
+  const user = await getPublicUserSelfById(session.userId, null)
 
   if (!user) {
     console.log('❌ [REFRESH] User not found in database');
     throw new AppError('User not found', 404, 'user_not_found')
   }
 
-  console.log('🔍 [REFRESH] Generating new access token');
   const accessToken = await generateAccessToken(user)
-  console.log('🔍 [REFRESH] Access token generated successfully');
 
-  console.log('🔍 [REFRESH] Generating new refresh token');
   const { token: newToken, hash: newHash, jti: newJti, expiresAt } = await generateRefreshToken()
-  console.log('🔍 [REFRESH] New refresh token generated');
-  console.log('🔍 [REFRESH] New token expires at:', expiresAt);
 
-  console.log('🔍 [REFRESH] Creating new session');
   await createSession({
     jti: newJti,
     userId: user.id,
@@ -174,19 +153,12 @@ router.post('/refresh', async (req, res) => {
     ip: req.ip ?? null,
     userAgent: req.headers['user-agent'] ?? null
   })
-  console.log('🔍 [REFRESH] New session created');
 
-  console.log('🔍 [REFRESH] Linking replaced session');
   await linkReplacedSession(session.jti, newJti)
-  console.log('🔍 [REFRESH] Session linked successfully');
 
-  // Set rotated cookie
-  console.log('🔍 [REFRESH] Setting new cookie with expiresAt:', expiresAt);
   attachRefreshCookie(res, newToken, expiresAt)
-  console.log('🔍 [REFRESH] New cookie set successfully');
 
   res.set('Cache-Control', 'no-store')
-  console.log('✅ [REFRESH] Success - returning new access token');
   res.json({ token: accessToken })
 });
 

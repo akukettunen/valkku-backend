@@ -2,7 +2,7 @@ import { query, Transaction } from '@/db/index';
 import { OBJECT_SCOPE } from '@/types/general';
 import { LocalizationObject } from '@/types/event';
 import { EVENT_PLAN_PART_SCOPE, PlanPartType } from '@/types/event';
-import { Event } from '@/types/event';
+import { Event, PublicEvent } from '@/types/event';
 
 export const createEvent = async (event: Event, createdById: string, trx?: Transaction) => {
   const {
@@ -59,7 +59,7 @@ export const getEventsByTeamIdDate = async (teamId: string, date: string) => {
     LEFT JOIN users as addedBy ON events.createdById = addedBy.id
     WHERE teamId = ? AND eventDate = ?
   `, [teamId, date]);
-  return result as Event[];
+  return result as (PublicEvent & { addedByName: string, addedByEmail: string, addedById: string })[];
 };
 
 export const getEventsByTeamIdRange = async (teamId: string, startDate: string, endDate: string) => {
@@ -74,7 +74,7 @@ export const getEventsByTeamIdRange = async (teamId: string, startDate: string, 
     LEFT JOIN users as addedBy ON events.createdById = addedBy.id
     WHERE events.teamId = ? AND events.eventDate BETWEEN ? AND ?
   `, [teamId, startDate, endDate]);
-  return result;
+  return result as (PublicEvent & { addedByName: string, addedByEmail: string, addedById: string })[];
 };
 
 export const getPlanPartTypeById = async (id: string) => {
@@ -135,5 +135,5 @@ export const getEventById = async (eventId: string) => {
   const result = await query(`
     SELECT * FROM events WHERE id = ?
   `, [eventId]);
-  return result;
+  return result as Event[];
 };

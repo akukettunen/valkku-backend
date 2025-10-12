@@ -1,5 +1,5 @@
 import { getUserTeams, getUserById, getUserTeamRoles } from "@/db/user";
-import { User, PublicUser } from "@/types/user"
+import { User, PublicUser, PublicUserSelf } from "@/types/user"
 import { TeamUser, TeamUserRole, PublicTeamUser } from "@/types/team";
 import { customAlphabet } from 'nanoid';
 
@@ -17,18 +17,41 @@ export function createPassword(): string {
   return nanoid();
 }
 
-export async function getPublicUserById(id: string, currentTeamId: string | null) {
+export async function getPublicUserSelfByIdSimple(id: string) {
   const [ user ] = await getUserById(id) as User[];
 
   if(!user) {
     return null;
   }
 
-  console.log("Get public user by id", user.email)
+  const publicUser: PublicUserSelf = {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    pendingDetails: user.pendingDetails,
+    preferredLanguage: user.preferredLanguage,
+    superAdmin: user.superAdmin,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    status: user.status,
+    emojiClickedCount: user.emojiClickedCount,
+    forcePasswordChange: user.forcePasswordChange,
+    teams: [],
+  };
+
+  return publicUser;
+}
+
+export async function getPublicUserSelfById(id: string, currentTeamId: string | null) {
+  const [ user ] = await getUserById(id) as User[];
+
+  if(!user) {
+    return null;
+  }
 
   const teams = await getUserTeams(user.id) as TeamUser[];
   const allTeamRoles = await getUserTeamRoles(user.id) as TeamUserRole[];
-  console.log("allTeamRoles", allTeamRoles)
   const publicTeams = teams.map(team => {
     const roles = allTeamRoles.filter(role => role.teamId === team.teamId);
     return {
@@ -42,7 +65,7 @@ export async function getPublicUserById(id: string, currentTeamId: string | null
   else if(!!publicTeams.find(team => team.teamId === currentTeamId)) newCurrentTeamId = currentTeamId!;
   else newCurrentTeamId = publicTeams[0]!.teamId || null;
 
-  const publicUser: PublicUser = {
+  const publicUser: PublicUserSelf = {
     id: user.id,
     email: user.email,
     firstName: user.firstName,

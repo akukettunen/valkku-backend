@@ -1,7 +1,7 @@
 // auth/tokens.ts
 import { JWTPayload, SignJWT, jwtVerify } from "jose"
 import crypto from "crypto"
-import { PublicUser, TokenUser } from "@/types/user"
+import { PublicUserSelf, TokenUser } from "@/types/user"
 import { MinimalTeamUser } from "@/types/user"
 
 // --- config ---
@@ -24,14 +24,14 @@ function nowSeconds() {
   return Math.floor(Date.now() / 1000)
 }
 
-export async function generateAccessToken(user: PublicUser): Promise<string> {
+export async function generateAccessToken(user: PublicUserSelf): Promise<string> {
   const jti = crypto.randomUUID()
   const iat = nowSeconds()
 
   const tokenUser: TokenUser = {
     sub: user.id.toString(),
     teams: user.teams.map(team => ({
-      roles: team.roles.map(role => ({ role: role.role, guardianOfId: role.guardianOf })),
+      roles: team.roles.map(role => ({ role: role.role, guardianOf: role.guardianOf })),
       teamId: team.teamId
     })) as MinimalTeamUser[],
     jti,

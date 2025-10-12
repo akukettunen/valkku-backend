@@ -14,7 +14,7 @@ import { getPlanByEventId } from '@/utils/planHelper';
 
 const router: Router = Router();
 
-// Only for teams events
+// Only for team events
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
   const tr = new Transaction();
@@ -25,7 +25,7 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
 
   const [ eventCreateData ] = await tr.execute();
   const id = eventCreateData.insertId;
-  const [ event ] = await getEventById(id) as PublicEvent[];
+  const [ event ] = await getEventById(id);
 
   res.status(201).json({
     success: true,
@@ -36,7 +36,7 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
 
 router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:update', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string, teamId: string };
-  const { ...event } = req.body as Event;
+  const { ...event } = req.body;
 
   const tr = new Transaction();
 
@@ -52,7 +52,12 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
   await tr.execute();
 
-  const [ updatedEvent ] = await getEventById(eventId) as PublicEvent[];
+  const [ updatedEvent ] = await getEventById(eventId);
+  // No need to sanitize event cause updating only allowed for team events
+
+  if(!updatedEvent) {
+    throw new AppError('Event not found', 404, 'something_went_wrong');
+  }
 
   res.status(200).json({
     success: true,
@@ -65,11 +70,15 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
   const { teamId } = req.params as { teamId: string };
   const { startDate, endDate, date, withPlans } = req.query as { startDate: string, endDate: string, date: string, withPlans: 'true' | 'false' };
 
-  let events: PublicEvent[];
+  let events;
   if(date) {
-    events = await getEventsByTeamIdDate(teamId, date) as Event[];
+    events = await getEventsByTeamIdDate(teamId, date);
   } else {
-    events = await getEventsByTeamIdRange(teamId, startDate, endDate) as Event[];
+    events = await getEventsByTeamIdRange(teamId, startDate, endDate);
+  }
+
+  if(!events) {
+    throw new AppError('Events not found', 404, 'something_went_wrong');
   }
 
   for(const event of events) {
@@ -83,9 +92,7 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
 
   if(withPlans === 'true') {
     for (const event of events) {
-      console.log('event.id', event.id);
       event.plan = await getPlanByEventId(event.id, teamId);
-      console.log('event.plan', event.plan);
     }
   }
 
@@ -101,7 +108,6 @@ router.post('/ai-generate/plan', requireSignedIn, async (req: Request, res: Resp
   const { prompt } = req.body as { prompt: string };
 })
 
-// TODO: figure out auth for user events
 router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { eventId, teamId } = req.params as { eventId: string, teamId: string };
   const [ event ] = await query(`

@@ -4,7 +4,7 @@ import { verifyToken } from "@/utils/tokenHelper"
 import { AppError } from "@/middleware/errors"
 import { PublicTeamUser, TeamUser, TeamUserRole } from "@/types/team"
 import scopes from "@/utils/scopes"
-import { ROLES } from "@/schemas/team";
+import { ROLES } from "@/types/team";
 import { TokenUser } from "@/types/user";
 import { OBJECT_SCOPE } from "@/types/general";
 
@@ -86,11 +86,14 @@ export function requireScope(scopeString: string, scope: 'individual' | 'team' |
 
     const user = req.user;
     const userTeams = user?.teams;
-    const userTeam = userTeams?.find(team => team.teamId === teamId) as PublicTeamUser | undefined;
-    if (!userTeam && scope === 'team') {
+
+    const roles = scope === 'team'
+      ? userTeams?.find(team => team.teamId === teamId)?.roles as TeamUserRole[]
+      : userTeams?.flatMap(team => team.roles) as TeamUserRole[];
+
+    if (!roles && scope === 'team') {
       throw new AppError('Team not found', 404, 'team_not_found');
     }
-    const roles = userTeam?.roles as TeamUserRole[];
     const allowedRoles = scopes[scope as keyof typeof scopes][scopeString as keyof (typeof scopes)[keyof typeof scopes]] as readonly (ROLES | 'guardian-as-athlete' | 'self')[];
 
     let allowed = false;
@@ -115,6 +118,8 @@ export function requireScope(scopeString: string, scope: 'individual' | 'team' |
         }
       }
     }
+
+    console.log('allowed', allowed);
 
     if (!allowed) {
       throw new AppError('Unauthorized', 403, 'unauthorized');

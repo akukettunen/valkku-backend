@@ -102,14 +102,14 @@ app.get('/api/status', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/api/plan', planRoutes);
 if (process.env['NODE_ENV'] !== 'test') {
   // Defer requiring event routes in tests to avoid mock shape mismatches
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const eventRoutes = require('@/routes/event').default;
   app.use('/api/event', eventRoutes);
 }
-app.use('/api/location', locationRoutes);
-app.use('/api/plan', planRoutes);
 
 if ((process.env['NODE_ENV'] || 'development') !== 'production') {
   app.use('/api/dev', devRoutes);
