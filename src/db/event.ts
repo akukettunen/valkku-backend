@@ -6,6 +6,7 @@ import { Event, PublicEvent } from '@/types/event';
 
 export const createEvent = async (event: Event, createdById: string, trx?: Transaction) => {
   const {
+    id,
     teamId,
     title,
     notes,
@@ -26,8 +27,9 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
   const toNull = (v: any) => (v === undefined ? null : v);
   const exec = trx ? trx.query.bind(trx) : query;
   const result = await exec(`
-    INSERT INTO events (teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
+    toNull(id),
     teamId,
     title,
     toNull(notes),
@@ -75,6 +77,16 @@ export const getEventsByTeamIdRange = async (teamId: string, startDate: string, 
     WHERE events.teamId = ? AND events.eventDate BETWEEN ? AND ?
   `, [teamId, startDate, endDate]);
   return result as (PublicEvent & { addedByName: string, addedByEmail: string, addedById: string })[];
+};
+
+export const getTeamEvents = async (teamId: string) => {
+  const result = await query(`
+    SELECT *, locations.*, events.id as id, locations.id as locationId
+    FROM events
+    LEFT JOIN locations ON events.locationId = locations.id
+    WHERE events.teamId = ?
+  `, [teamId]);
+  return result as Event[];
 };
 
 export const getPlanPartTypeById = async (id: string) => {

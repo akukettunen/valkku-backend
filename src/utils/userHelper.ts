@@ -3,9 +3,9 @@ import { User, PublicUser, PublicUserSelf } from "@/types/user"
 import { TeamUser, TeamUserRole, PublicTeamUser } from "@/types/team";
 import { customAlphabet } from 'nanoid';
 
-export function createId(): string {
+export function createId(len?: number): string {
   const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  const nanoid = customAlphabet(alphabet, 12);
+  const nanoid = customAlphabet(alphabet, len || 12);
 
   return nanoid();
 }

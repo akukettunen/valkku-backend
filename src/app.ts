@@ -17,6 +17,7 @@ import teamRoutes from '@/routes/team';
 import locationRoutes from '@/routes/location';
 import planRoutes from '@/routes/plan';
 import devRoutes from '@/routes/dev';
+import calendarRoutes from '@/routes/calendar';
 
 // Load environment variables
 dotenv.config({ quiet: true });
@@ -104,6 +105,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/location', locationRoutes);
 app.use('/api/plan', planRoutes);
+app.use('/api/calendar', calendarRoutes);
 if (process.env['NODE_ENV'] !== 'test') {
   // Defer requiring event routes in tests to avoid mock shape mismatches
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -114,6 +116,7 @@ if (process.env['NODE_ENV'] !== 'test') {
 if ((process.env['NODE_ENV'] || 'development') !== 'production') {
   app.use('/api/dev', devRoutes);
 }
+
 
 app.use(notFound);
 app.use(errorHandler);

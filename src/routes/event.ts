@@ -7,10 +7,11 @@ import { createEvent, getEventById } from '@/db/event';
 import { createEventSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
 import { query } from '@/db/index';
-import { Event, Plan, PublicEvent } from '@/types/event';
+import { PublicEvent } from '@/types/event';
 import { Location } from './location';
 import { hasRoleInTeam } from '@/utils/authHelper';
 import { getPlanByEventId } from '@/utils/planHelper';
+import { fetchTeamEvents } from '@/utils/eventHelper';
 
 const router: Router = Router();
 
@@ -47,13 +48,14 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
   });
 
   tr.addTr(async (trx) => {
-    return await createEvent({...event, teamId}, req.user?.sub!, trx);
+    return await createEvent({ id: eventId, ...event, teamId}, req.user?.sub!, trx);
   })
 
   await tr.execute();
-
+  console.log("eventId", eventId);
   const [ updatedEvent ] = await getEventById(eventId);
-  // No need to sanitize event cause updating only allowed for team events
+
+  console.log("updatedEvent", updatedEvent);
 
   if(!updatedEvent) {
     throw new AppError('Event not found', 404, 'something_went_wrong');
@@ -70,12 +72,7 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
   const { teamId } = req.params as { teamId: string };
   const { startDate, endDate, date, withPlans } = req.query as { startDate: string, endDate: string, date: string, withPlans: 'true' | 'false' };
 
-  let events;
-  if(date) {
-    events = await getEventsByTeamIdDate(teamId, date);
-  } else {
-    events = await getEventsByTeamIdRange(teamId, startDate, endDate);
-  }
+  const events = await fetchTeamEvents(teamId, date, startDate, endDate);
 
   if(!events) {
     throw new AppError('Events not found', 404, 'something_went_wrong');
