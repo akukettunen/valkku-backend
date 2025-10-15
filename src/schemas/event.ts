@@ -38,7 +38,7 @@ export const createEventSchema = z.object({
     }
   }
 
-  if (data.repeats === 'weekly' && (data.repeatsOn == null || data.repeatsOn === '')) {
+  if (data.repeats === 'daily' && (data.repeatsOn == null || data.repeatsOn === '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'repeatsOn required for weekly repeats', path: ['repeatsOn'] });
   }
 

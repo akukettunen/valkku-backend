@@ -255,12 +255,11 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
 
   // Compute DATE for all-day using optional local offset
   const deriveAllDayDates = (base: Date): { startDate: string; endDate: string } => {
-    // Shift by local offset so that e.g., 2025-10-01T21:00:00Z with +180 mins
-    // maps to the intended local date before stripping time.
-    const shifted = new Date(base.getTime() + allDayLocalOffsetMinutes * 60_000);
-    const ymd = fmtDateOnly(shifted);
+    // For timezone-agnostic behavior, use the base date as-is for all-day events
+    // This ensures consistent behavior regardless of server timezone
+    const ymd = fmtDateOnly(base);
     // Add one day for non-inclusive DTEND
-    const next = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1));
+    const next = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate() + 1));
     const ymdNext = fmtDateOnly(next);
     return { startDate: ymd, endDate: ymdNext };
   };
@@ -278,7 +277,9 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     if (hasExplicitStart) {
       baseStart = fromUnix(ev.startTimeUnixSec!);
     } else if (ev.eventDate) {
-      const d = new Date(ev.eventDate);
+      // Parse eventDate as UTC to ensure timezone consistency
+      // This prevents issues where "2025-01-15" is interpreted differently across timezones
+      const d = new Date(ev.eventDate + 'T00:00:00Z');
       if (!Number.isNaN(d.getTime())) baseStart = d;
     }
     if (!baseStart) return null;
