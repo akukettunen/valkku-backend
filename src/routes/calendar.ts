@@ -7,7 +7,6 @@ import { requireSignedIn } from '@/middleware/auth';
 import z from 'zod';
 import { validate } from '@/middleware/validation';
 import { createId } from '@/utils/userHelper';
-import { fetchTeamEvents } from '@/utils/eventHelper';
 import { getTeamEvents } from '@/db/event';
 import { EventInput, eventsToICS } from '@/utils/calendarHelper';
 import { createHash } from 'crypto';
