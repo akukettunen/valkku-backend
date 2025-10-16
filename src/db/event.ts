@@ -81,7 +81,8 @@ export const getEventsByTeamIdRange = async (teamId: string, startDate: string, 
 
 export const getTeamEvents = async (teamId: string) => {
   const result = await query(`
-    SELECT *, locations.*, events.id as id, locations.id as locationId
+    SELECT *, locations.*, events.id as id, locations.id as locationId,
+      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd
     FROM events
     LEFT JOIN locations ON events.locationId = locations.id
     WHERE events.teamId = ?

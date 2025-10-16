@@ -84,6 +84,20 @@ router.get("/:token", async (req: Request, res: Response) => {
     throw new AppError("Team not found", 404, "team_not_found");
   }
 
+  // Debug: Log events to see what we're working with
+  console.log(`Found ${events.length} events for team ${sub.teamId}`);
+  events.forEach((ev, i) => {
+    console.log(`Event ${i}:`, {
+      id: ev.id,
+      title: ev.title,
+      eventDate: ev.eventDate,
+      startTimeUnixSec: ev.startTimeUnixSec,
+      endTimeUnixSec: ev.endTimeUnixSec,
+      durationInMinutes: ev.durationInMinutes,
+      type: ev.type
+    });
+  });
+
   // 4. Build ICS feed
   const host = process.env['APP_URL'] || 'https://valkku.com';
   const domain = host.split("//")[1]?.split("/")[0] || 'valkku.com';
@@ -100,24 +114,37 @@ router.get("/:token", async (req: Request, res: Response) => {
     defaultDurationMinutes: 60,
     locale: user.preferredLanguage
   });
-  // 5. Force fresh content - disable caching for calendar feeds
+  // 5. Conditional caching (preferred by calendar clients)
   const etag = `W/"${createHash("sha1").update(ics).digest("hex")}"`;
   const newestUpdatedAt = events
     .map(e => (e.updatedAt ? new Date(e.updatedAt).getTime() : 0))
     .reduce((a, b) => Math.max(a, b), 0);
   const lastModified = new Date(newestUpdatedAt || Date.now()).toUTCString();
 
-  // 6. Respond with ICS file - no caching to ensure updates
-  const filename = `cal-${Date.now()}-${sub.teamId}.ics`;
+  const ifNoneMatch = req.headers["if-none-match"];
+  const ifModifiedSince = req.headers["if-modified-since"];
+  const modifiedSinceOk = ifModifiedSince ? (new Date(ifModifiedSince).getTime() >= new Date(lastModified).getTime()) : false;
 
+  if (ifNoneMatch === etag || modifiedSinceOk) {
+    res
+      .status(304)
+      .set({
+        ETag: etag,
+        "Cache-Control": "public, max-age=60, must-revalidate",
+        "Last-Modified": lastModified,
+      })
+      .end();
+    return;
+  }
+
+  // 6. Respond with ICS file
   res
     .status(200)
     .set({
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-cache, no-store, must-revalidate, private",
-      "Pragma": "no-cache",
-      "Expires": "0",
+      // Prefer inline for subscriptions
+      "Content-Disposition": `inline; filename="team-${sub.teamId}.ics"`,
+      "Cache-Control": "public, max-age=60, must-revalidate",
       ETag: etag,
       "Last-Modified": lastModified,
     })

@@ -12,7 +12,8 @@ export interface EventInput {
   ownNotes?: string | null;
   coachesNotes?: string | null;
 
-  eventDate?: string | null;              // ISO UTC string
+  eventDate?: string | null;              // original date/time from DB (may be ISO)
+  eventDateYmd?: string | null;           // injected 'YYYY-MM-DD' from DB layer
   startTimeUnixSec?: number | null;
   endTimeUnixSec?: number | null;
   durationInMinutes?: number | null;
@@ -276,10 +277,19 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     let baseStart: Date | null = null;
     if (hasExplicitStart) {
       baseStart = fromUnix(ev.startTimeUnixSec!);
-    } else if (ev.eventDate) {
-      // Parse eventDate as UTC to ensure timezone consistency
-      // This prevents issues where "2025-01-15" is interpreted differently across timezones
-      const d = new Date(ev.eventDate + 'T00:00:00Z');
+    } else if (ev.eventDate || ev.eventDateYmd) {
+      // Parse eventDate - extract just the date part for all-day events
+      let dateStr = ev.eventDateYmd || ev.eventDate!;
+      if (typeof dateStr === 'string') {
+        if (dateStr.includes('T')) {
+          // Extract just the date part from ISO string (e.g., "2025-10-15T21:00:00.000Z" -> "2025-10-15")
+          const datePart = dateStr.split('T')[0];
+          if (datePart) dateStr = datePart;
+        }
+        // Always treat as UTC midnight for consistent all-day behavior
+        dateStr = dateStr + 'T00:00:00Z';
+      }
+      const d = new Date(dateStr);
       if (!Number.isNaN(d.getTime())) baseStart = d;
     }
 
@@ -298,7 +308,24 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     if (shouldBeAllDay) {
       // All-day encoding (DATE values, end date is next day)
       // For all-day events, use eventDate if baseStart is not available
-      const allDayBase = baseStart || (ev.eventDate ? new Date(ev.eventDate + 'T00:00:00Z') : new Date());
+      let allDayBase: Date;
+      if (baseStart) {
+        allDayBase = baseStart;
+      } else if (ev.eventDate || ev.eventDateYmd) {
+        let dateStr = ev.eventDateYmd || ev.eventDate!;
+        if (typeof dateStr === 'string') {
+          if (dateStr.includes('T')) {
+            // Extract just the date part from ISO string
+            const datePart = dateStr.split('T')[0];
+            if (datePart) dateStr = datePart;
+          }
+          // Always treat as UTC midnight for consistent all-day behavior
+          dateStr = dateStr + 'T00:00:00Z';
+        }
+        allDayBase = new Date(dateStr);
+      } else {
+        allDayBase = new Date();
+      }
       const { startDate, endDate } = deriveAllDayDates(allDayBase);
       lines.push(`DTSTART;VALUE=DATE:${startDate}`);
       lines.push(`DTEND;VALUE=DATE:${endDate}`);
@@ -358,7 +385,12 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
 
   for (const ev of events) {
     const vevent = eventToVEvent(ev);
-    if (vevent) cal.push(vevent);
+    if (vevent) {
+      cal.push(vevent);
+      console.log(`✅ Included event: ${ev.title} (${ev.type})`);
+    } else {
+      console.log(`❌ Excluded event: ${ev.title} (${ev.type}) - no valid time data`);
+    }
   }
 
   cal.push("END:VCALENDAR");
