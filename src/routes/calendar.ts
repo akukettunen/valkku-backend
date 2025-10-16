@@ -100,26 +100,14 @@ router.get("/:token", async (req: Request, res: Response) => {
     defaultDurationMinutes: 60,
     locale: user.preferredLanguage
   });
-  // 5. Add caching (ETag + Last-Modified)
+  // 5. Force fresh content - disable caching for calendar feeds
   const etag = `W/"${createHash("sha1").update(ics).digest("hex")}"`;
   const newestUpdatedAt = events
     .map(e => (e.updatedAt ? new Date(e.updatedAt).getTime() : 0))
     .reduce((a, b) => Math.max(a, b), 0);
   const lastModified = new Date(newestUpdatedAt || Date.now()).toUTCString();
 
-  if (req.headers["if-none-match"] === etag) {
-    res
-      .status(304)
-      .set({
-        ETag: etag,
-        "Cache-Control": "public, max-age=300, must-revalidate",
-        "Last-Modified": lastModified,
-      })
-      .end();
-    return;
-  }
-
-  // 6. Respond with ICS file
+  // 6. Respond with ICS file - no caching to ensure updates
   const filename = `cal-${Date.now()}-${sub.teamId}.ics`;
 
   res
@@ -127,7 +115,9 @@ router.get("/:token", async (req: Request, res: Response) => {
     .set({
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "public, max-age=300, must-revalidate",
+      "Cache-Control": "no-cache, no-store, must-revalidate, private",
+      "Pragma": "no-cache",
+      "Expires": "0",
       ETag: etag,
       "Last-Modified": lastModified,
     })
