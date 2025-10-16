@@ -282,7 +282,9 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
       const d = new Date(ev.eventDate + 'T00:00:00Z');
       if (!Number.isNaN(d.getTime())) baseStart = d;
     }
-    if (!baseStart) return null;
+
+    // For all-day events with duration, we need at least an eventDate
+    if (!baseStart && !shouldBeAllDay) return null;
 
     const lines: string[] = [];
     lines.push("BEGIN:VEVENT");
@@ -295,12 +297,15 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
 
     if (shouldBeAllDay) {
       // All-day encoding (DATE values, end date is next day)
-      const { startDate, endDate } = deriveAllDayDates(baseStart);
+      // For all-day events, use eventDate if baseStart is not available
+      const allDayBase = baseStart || (ev.eventDate ? new Date(ev.eventDate + 'T00:00:00Z') : new Date());
+      const { startDate, endDate } = deriveAllDayDates(allDayBase);
       lines.push(`DTSTART;VALUE=DATE:${startDate}`);
       lines.push(`DTEND;VALUE=DATE:${endDate}`);
       lines.push("X-MICROSOFT-CDO-ALLDAYEVENT:TRUE");
     } else {
       // Timed event: produce UTC DTSTART/DTEND
+      if (!baseStart) return null; // Timed events need a start time
       let dtEnd: Date | null = null;
       if (hasExplicitEnd) {
         dtEnd = fromUnix(ev.endTimeUnixSec!);

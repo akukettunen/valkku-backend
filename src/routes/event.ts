@@ -106,6 +106,7 @@ router.post('/ai-generate/plan', requireSignedIn, async (req: Request, res: Resp
 })
 
 router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  console.log('HEREE HEREE 2')
   const { eventId, teamId } = req.params as { eventId: string, teamId: string };
   const [ event ] = await query(`
     SELECT events.*, users.email as createdByEmail, users.fullName as createdByName FROM events
@@ -117,6 +118,8 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
     throw new AppError('Event not found', 404, 'event_not_found');
   }
 
+  console.log('HEREE HEREE')
+
   const [ location ] = await query(`
     SELECT * FROM locations
     WHERE id = ?
@@ -127,6 +130,9 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
   if(event.createdById !== req.user?.sub) {
     delete event.ownNotes;
   }
+
+  console.log('has role in team: ', hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach']))
+
   if(!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
     delete event.coachesNotes;
   }
