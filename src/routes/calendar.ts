@@ -76,8 +76,6 @@ router.get("/:token", async (req: Request, res: Response) => {
     throw new AppError("User not found for subscription", 404, "user_not_found");
   }
 
-  console.log("user", user);
-
   // 3. Fetch team events
   const events = (await getTeamEvents(sub.teamId)) as unknown as EventInput[];
   if (!events) {
@@ -114,6 +112,7 @@ router.get("/:token", async (req: Request, res: Response) => {
     defaultDurationMinutes: 60,
     locale: user.preferredLanguage
   });
+
   // 5. Conditional caching (preferred by calendar clients)
   const etag = `W/"${createHash("sha1").update(ics).digest("hex")}"`;
   const newestUpdatedAt = events

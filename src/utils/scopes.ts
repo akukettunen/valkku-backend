@@ -27,6 +27,7 @@ export default {
 
     "event:create": ["owner", "admin", "coach"],
     "event:update": ["owner", "admin", "coach"],
+    "event:delete": ["owner", "admin", "coach"],
     "event:read": ["owner", "admin", "coach", "athlete", "guardian"],
 
     "ownership:transfer": ["owner"],

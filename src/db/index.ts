@@ -18,6 +18,9 @@ const databaseConfig = {
   // mysql2 v3 pool idle tuning
   maxIdle: 10,           // max idle connections, same as connectionLimit by default
   idleTimeout: 60_000,   // prune idle connections after 60s
+  // Timezone configuration: treat all dates/times as timezone-agnostic
+  timezone: 'Z',         // Force UTC timezone to avoid local conversions
+  dateStrings: true,     // Return DATE/DATETIME as strings instead of Date objects
 } as const;
 
 const pool = mysql.createPool(databaseConfig);

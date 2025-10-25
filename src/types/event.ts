@@ -25,6 +25,7 @@ export interface Event {
   startTimeUnixSec: number;
   endTimeUnixSec: number;
   durationInMinutes: number | null; // for independent and mental events
+  timezone: string; // IANA timezone identifier (e.g., 'Europe/Helsinki', 'America/New_York')
   repeats: EVENT_REPEATS;
   repeatsOn: string | null; // '1001010' = every monday, thursday and sunday - only if repeats daily
   repeatsUntilUnixSec: string | null; // format: YYYY-MM-DD (mysql DATE) - repeats until the end of this date so this day is included in repeat

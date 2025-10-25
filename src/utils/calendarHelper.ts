@@ -17,6 +17,7 @@ export interface EventInput {
   startTimeUnixSec?: number | null;
   endTimeUnixSec?: number | null;
   durationInMinutes?: number | null;
+  timezone?: string | null;               // IANA timezone identifier
 
   repeats?: string | null;                // e.g., "daily"
   repeatsOn?: string | null;              // 7-char mask "1100000" (Mon..Sun)

@@ -11,10 +11,11 @@ export const createEventSchema = z.object({
   startTimeUnixSec: z.number().nullable().optional(),
   endTimeUnixSec: z.number().nullable().optional(),
   durationInMinutes: z.number().positive().nullable().optional(),
+  timezone: z.string().optional().default('Europe/Helsinki'), // IANA timezone identifier
   repeats: z.enum(['daily', 'weekly', 'monthly']).optional(),
   repeatsOn: z.string().nullable().optional(),
-  repeatsUntilUnixSec: z.number().optional(),
-  status: z.string().optional()
+  repeatsUntilUnixSec: z.number().optional().nullable(),
+  status: z.string().optional().nullable()
 }).superRefine((data, ctx) => {
   const hasStart = data.startTimeUnixSec != null;
   const hasEnd = data.endTimeUnixSec != null;
@@ -40,10 +41,6 @@ export const createEventSchema = z.object({
 
   if (data.repeats === 'daily' && (data.repeatsOn == null || data.repeatsOn === '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'repeatsOn required for weekly repeats', path: ['repeatsOn'] });
-  }
-
-  if (data.repeats && data.repeatsUntilUnixSec == null) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'repeatsUntilUnixSec required when repeats is set', path: ['repeatsUntilUnixSec'] });
   }
 })
 

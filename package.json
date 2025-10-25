@@ -25,6 +25,7 @@
     "argon2": "^0.44.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",
@@ -59,7 +60,6 @@
     "typescript": "^5.9.2",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
-  }
-  ,
+  },
   "packageManager": "pnpm@10.18.2"
 }

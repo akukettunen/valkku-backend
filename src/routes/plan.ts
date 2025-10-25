@@ -148,7 +148,9 @@ router.get('/plan-part-type/team/:teamId', requireSignedIn, async (req: Request,
 });
 
 router.get('/plan-part-type/me', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {
-  const eventPlanPartTypes = await getPlanPartTypes('user', null, req.user?.sub!, false);
+  const includeArchived: boolean = req.query['includeArchived'] === 'true' ? true : false;
+
+  const eventPlanPartTypes = await getPlanPartTypes('user', null, req.user?.sub!, includeArchived);
   res.status(200).json({
     success: true,
     message: 'Event plan part types fetched successfully',

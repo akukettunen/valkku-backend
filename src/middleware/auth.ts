@@ -57,9 +57,6 @@ export function validateBasedOnScope(action: string) {
     if (!scope) throw new AppError('Scope is required', 400, 'something_went_wrong');
     if(!action) throw new AppError('Action is required', 400, 'something_went_wrong');
 
-    console.log('scope', scope);
-    console.log('action', action);
-
     switch (scope) {
       case 'team':
         return requireScope(action, 'team')(req, res, next);
@@ -82,7 +79,7 @@ export function requireScope(scopeString: string, scope: 'individual' | 'team' |
     }
 
     let teamId = req.params['teamId'] || req.query['teamId'] || req.body['teamId'];
-    let userId = req.params['userId'] || req.query['userId'] || req.body['userId'];
+    let userId = req.params['userId'] || req.query['userId'] || req.body['userId'] || req.user?.sub;
 
     const user = req.user;
     const userTeams = user?.teams;

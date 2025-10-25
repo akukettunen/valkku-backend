@@ -17,6 +17,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     startTimeUnixSec,
     endTimeUnixSec,
     locationId,
+    timezone,
     repeats,
     repeatsOn,
     repeatsUntilUnixSec,
@@ -27,7 +28,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
   const toNull = (v: any) => (v === undefined ? null : v);
   const exec = trx ? trx.query.bind(trx) : query;
   const result = await exec(`
-    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     toNull(id),
     teamId,
@@ -40,6 +41,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     toNull(startTimeUnixSec),
     toNull(endTimeUnixSec),
     toNull(locationId),
+    timezone || 'Europe/Helsinki',
     toNull(repeats),
     toNull(repeatsOn),
     toNull(repeatsUntilUnixSec),
