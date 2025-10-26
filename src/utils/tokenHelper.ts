@@ -101,40 +101,4 @@ export function verifyRefreshToken(presentedToken: string, storedHash: string): 
 // --- Cookie helpers ---
 
 // Compute cross-site cookie settings depending on environment
-export function getCookieOptionsBase() {
-  const isProdLike = process.env['NODE_ENV'] !== 'development'
-  const sameSite: 'lax' | 'strict' | 'none' = isProdLike ? 'none' : 'lax'
-  const domain = process.env['NODE_ENV'] !== 'development' ? '.valkku.ai' : null
-  return { isProdLike, sameSite, domain }
-}
-
-// Attach refresh token cookie to response
-export function attachRefreshCookie(res: any, token: string, expiresAt: Date) {
-  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-
-  res.set('Cache-Control', 'no-store')
-  res.set('Pragma', 'no-cache')
-  res.set('Expires', '0')
-
-  res.cookie('rtid', token, {
-    httpOnly: true,
-    secure: isProdLike,
-    sameSite,
-    domain,
-    path: '/api/auth/refresh',
-    maxAge: Math.max(0, new Date(expiresAt).getTime() - Date.now())
-  })
-}
-
-// Clear refresh token cookie from response
-export function clearRefreshCookie(res: any) {
-  const { isProdLike, sameSite, domain } = getCookieOptionsBase()
-
-  res.clearCookie("rtid", {
-    httpOnly: true,
-    secure: isProdLike,
-    sameSite,
-    domain,
-    path: "/api/auth/refresh"
-  })
-}
+// Cookie helpers removed: we now pass refresh tokens via JSON, not cookies

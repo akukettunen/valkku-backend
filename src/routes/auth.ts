@@ -8,7 +8,7 @@ const router: Router = Router();
 import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
 import { verifyPassword } from "@/utils/authHelper";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken, attachRefreshCookie, clearRefreshCookie } from "@/utils/tokenHelper";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/utils/tokenHelper";
 import { requireSignedIn } from "@/middleware/auth";
 import {
   findSessionByHash,
@@ -47,14 +47,14 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
     userAgent: req.headers['user-agent'] ?? null
   })
 
-  attachRefreshCookie(res, token, expiresAt)
-
   return res.status(200).json({
     success: true,
     message: 'Login successful',
     code: 'login_successful',
     data: {
       token: accessToken,
+      refreshToken: token,
+      refreshExpiresAt: expiresAt.toISOString(),
       user: publicUser
     }
   })
@@ -95,15 +95,16 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 });
 
 router.post('/refresh', async (req, res) => {
-  const cookie = req.cookies?.rtid
+  const presented = (req.body?.refreshToken as string | undefined)
+    || (req.headers['x-refresh-token'] as string | undefined);
 
-  if (!cookie) {
-    console.log('❌ [REFRESH] Missing refresh token cookie');
+  if (!presented) {
+    console.log('❌ [REFRESH] Missing refresh token in body or x-refresh-token header');
     throw new AppError('Missing refresh token', 401, 'missing_refresh')
   }
 
-  console.log('🔍 [REFRESH] Cookie found, hashing token');
-  const hash = hashRefreshToken(cookie)
+  console.log('🔍 [REFRESH] Refresh token provided, hashing token');
+  const hash = hashRefreshToken(presented)
   console.log('🔍 [REFRESH] Token hash created');
 
   const session = await findSessionByHash(hash)
@@ -156,18 +157,11 @@ router.post('/refresh', async (req, res) => {
 
   await linkReplacedSession(session.jti, newJti)
 
-  attachRefreshCookie(res, newToken, expiresAt)
-
   res.set('Cache-Control', 'no-store')
-  res.json({ token: accessToken })
+  res.json({ token: accessToken, refreshToken: newToken, refreshExpiresAt: expiresAt.toISOString() })
 });
 
 router.post("/logout", async (req: Request, res: Response) => {
-  const cookie = req.cookies['rtid']
-
-  // Clear the refresh cookie
-  clearRefreshCookie(res)
-
   res.set("Cache-Control", "no-store")
   return res.status(204).end()
 });
