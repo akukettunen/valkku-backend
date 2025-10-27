@@ -35,3 +35,22 @@ export const changePasswordSchema = z.object({
 // Export types for use in route handlers
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// Password reset schemas
+export const requestPasswordResetSchema = z.object({
+  email: emailSchema
+});
+
+// accept token and new password
+export const confirmPasswordResetSchema = z.object({
+  token: z.string().min(32).max(512),
+  newPassword: passwordSchema
+});
+
+export const verifyPasswordResetSchema = z.object({
+  token: z.string().min(32).max(512)
+});
+
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchema>;
+export type VerifyPasswordResetInput = z.infer<typeof verifyPasswordResetSchema>;

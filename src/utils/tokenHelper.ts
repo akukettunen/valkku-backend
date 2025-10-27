@@ -7,8 +7,8 @@ import { MinimalTeamUser } from "@/types/user"
 // --- config ---
 const ISS = process.env["JWT_ISSUER"]!
 const AUD = process.env["JWT_AUDIENCE"]!
-const ACCESS_TTL_SEC = 15 * 60 // 15 min
 
+const ACCESS_TTL_SEC = 15 * 60 // 15 min
 const REFRESH_TTL_SEC = parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 // 90 days
 
 // HS256 secret (switch to EdDSA/RS256 for prod if you can)
@@ -18,6 +18,7 @@ const ENC_KEY = new TextEncoder().encode(JWT_SECRET)
 // Optional app-wide pepper for refresh tokens
 const REFRESH_PEPPER = process.env["REFRESH_PEPPER"] ?? ""
 const INVITE_TOKEN_PEPPER = process.env["INVITE_TOKEN_PEPPER"] ?? ""
+const PASSWORD_RESET_PEPPER = process.env["PASSWORD_RESET_PEPPER"] ?? ""
 
 // ---- helpers ----
 function nowSeconds() {
@@ -87,6 +88,11 @@ export function hashRefreshToken(token: string): string {
 
 export function hashInviteToken(token: string): string {
   return crypto.createHash("sha256").update(token + INVITE_TOKEN_PEPPER, "utf8").digest("base64url")
+}
+
+export function hashPasswordResetToken(token: string): string {
+  // Store as hex (64 chars) per table definition; use same hash algo
+  return crypto.createHash("sha256").update(token + PASSWORD_RESET_PEPPER, "utf8").digest("hex")
 }
 
 /** Constant-time check of a presented refresh token against stored hash. */

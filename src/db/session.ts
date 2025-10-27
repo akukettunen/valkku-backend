@@ -86,3 +86,10 @@ export const touchSession = async (jti: string) => {
     [jti]
   )
 }
+
+export const revokeAllUserSessions = async (userId: string) => {
+  return await query(
+    `UPDATE sessions SET revokedAt = NOW(3) WHERE userId = ? AND revokedAt IS NULL`,
+    [userId]
+  )
+}

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { signupSchema, loginSchema, changePasswordSchema } from "@/schemas/auth";
+import { signupSchema, loginSchema, changePasswordSchema, requestPasswordResetSchema, verifyPasswordResetSchema, confirmPasswordResetSchema } from "@/schemas/auth";
 import { validate } from "@/middleware/validation";
 import { createUser, getUserByEmail, getUserById, updateUserPassword, getUserTeams } from "@/db/user";
 import { User } from "@/types/user";
@@ -8,7 +8,7 @@ const router: Router = Router();
 import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
 import { verifyPassword } from "@/utils/authHelper";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/utils/tokenHelper";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, hashPasswordResetToken } from "@/utils/tokenHelper";
 import { requireSignedIn } from "@/middleware/auth";
 import {
   findSessionByHash,
@@ -17,6 +17,11 @@ import {
 } from '@/db/session'
 import { createId } from '@/utils/userHelper';
 import { sendWelcomeEmail } from "@/utils/emailHelper";
+import { sendPasswordResetEmail } from "@/utils/emailHelper";
+import crypto from 'crypto';
+import { createPasswordReset, findByTokenHash, markUsedById } from '@/db/passwordReset';
+import { Transaction } from '@/db/index';
+import { revokeAllUserSessions } from '@/db/session';
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -197,6 +202,85 @@ router.post("/change-password", requireSignedIn, validate(changePasswordSchema),
     message: 'Password changed successfully',
     code: 'password_changed_successfully'
   });
+});
+
+// Request a password reset - always respond success to prevent user enumeration
+router.post('/password-reset/request', validate(requestPasswordResetSchema), async (req: Request, res: Response) => {
+  const { email } = req.body as { email: string };
+
+  const [user] = await getUserByEmail(email);
+
+  if (user) {
+    const rawToken = crypto.randomBytes(48).toString('base64url');
+    const tokenHash = hashPasswordResetToken(rawToken);
+    const ttlMinutes = parseInt(process.env['PASSWORD_RESET_TTL_MINUTES'] || '30', 10);
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
+
+    try {
+      await createPasswordReset(user.id, tokenHash, expiresAt);
+      await sendPasswordResetEmail(user.email, rawToken, user.firstName || undefined, (user.preferredLanguage as any) || 'en');
+    } catch (e) {
+      // swallow to avoid leaking existence or errors; log server-side
+      console.error('password reset request failed', e);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'If an account exists, a reset email has been sent',
+    code: 'reset_email_sent'
+  });
+});
+
+// Verify a password reset token
+router.post('/password-reset/verify', validate(verifyPasswordResetSchema), async (req: Request, res: Response) => {
+  const { token } = req.body as { token: string };
+  const tokenHash = hashPasswordResetToken(token);
+  const row = await findByTokenHash(tokenHash);
+
+  if (!row || row.used) {
+    throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
+  }
+  const now = Date.now();
+  const expiresAt = new Date(row.expires_at).getTime();
+  if (expiresAt < now) {
+    throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
+  }
+
+  return res.status(200).json({ success: true, message: 'Token is valid', code: 'token_valid' });
+});
+
+// Confirm a password reset
+router.post('/password-reset/confirm', validate(confirmPasswordResetSchema), async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body as { token: string; newPassword: string };
+
+  const tokenHash = hashPasswordResetToken(token);
+  const row = await findByTokenHash(tokenHash);
+
+  if (!row || row.used) {
+    throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
+  }
+
+  const now = Date.now();
+  const expiresAt = new Date(row.expires_at).getTime();
+  if (expiresAt < now) {
+    throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
+  }
+
+  const newHash = await hashPassword(newPassword);
+
+  // Transactionally set password and mark token used
+  const tr = new Transaction();
+  await tr.addTr(async (trx) => {
+    await trx.query(`UPDATE users SET passwordHash = ? WHERE id = ?`, [newHash, row.user_id]);
+    await trx.query(`UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE id = ?`, [row.id]);
+    return true;
+  }).execute();
+
+  // Revoke all sessions for this user after password change
+  await revokeAllUserSessions(row.user_id);
+
+  return res.status(200).json({ success: true, message: 'Password reset successful', code: 'password_reset_success' });
 });
 
 export default router;
