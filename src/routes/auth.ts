@@ -8,7 +8,7 @@ const router: Router = Router();
 import { AppError } from "@/middleware/errors";
 import { hashPassword } from "@/utils/authHelper";
 import { verifyPassword } from "@/utils/authHelper";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken, hashPasswordResetToken } from "@/utils/tokenHelper";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, hashPasswordResetToken, attachRefreshTokenCookie, clearRefreshTokenCookie } from "@/utils/tokenHelper";
 import { requireSignedIn } from "@/middleware/auth";
 import {
   findSessionByHash,
@@ -52,13 +52,16 @@ router.post('/signin', validate(loginSchema), async (req: Request, res: Response
     userAgent: req.headers['user-agent'] ?? null
   })
 
+  // Set refresh token as httpOnly cookie
+  attachRefreshTokenCookie(res, token, expiresAt)
+
   return res.status(200).json({
     success: true,
     message: 'Login successful',
     code: 'login_successful',
     data: {
       token: accessToken,
-      refreshToken: token,
+      refreshToken: token, // we return this for the mobile app. frontend should not store this in localStorage
       refreshExpiresAt: expiresAt.toISOString(),
       user: publicUser
     }
@@ -100,11 +103,12 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 });
 
 router.post('/refresh', async (req, res) => {
-  const presented = (req.body?.refreshToken as string | undefined)
+  const presented = (req.cookies?.refreshToken as string | undefined)
+    || (req.body?.refreshToken as string | undefined)
     || (req.headers['x-refresh-token'] as string | undefined);
 
   if (!presented) {
-    console.log('❌ [REFRESH] Missing refresh token in body or x-refresh-token header');
+    console.log('❌ [REFRESH] Missing refresh token in cookie, body or x-refresh-token header');
     throw new AppError('Missing refresh token', 401, 'missing_refresh')
   }
 
@@ -162,11 +166,21 @@ router.post('/refresh', async (req, res) => {
 
   await linkReplacedSession(session.jti, newJti)
 
+  // Set new refresh token as httpOnly cookie
+  attachRefreshTokenCookie(res, newToken, expiresAt)
+
   res.set('Cache-Control', 'no-store')
-  res.json({ token: accessToken, refreshToken: newToken, refreshExpiresAt: expiresAt.toISOString() })
+  res.json({
+    token: accessToken,
+    refreshToken: newToken, // we return this for the mobile app. frontend should not store this in localStorage
+    refreshExpiresAt: expiresAt.toISOString()
+  })
 });
 
 router.post("/logout", async (req: Request, res: Response) => {
+  // Clear the refresh token cookie
+  clearRefreshTokenCookie(res)
+
   res.set("Cache-Control", "no-store")
   return res.status(204).end()
 });
@@ -204,7 +218,6 @@ router.post("/change-password", requireSignedIn, validate(changePasswordSchema),
   });
 });
 
-// Request a password reset - always respond success to prevent user enumeration
 router.post('/password-reset/request', validate(requestPasswordResetSchema), async (req: Request, res: Response) => {
   const { email } = req.body as { email: string };
 
@@ -232,7 +245,6 @@ router.post('/password-reset/request', validate(requestPasswordResetSchema), asy
   });
 });
 
-// Verify a password reset token
 router.post('/password-reset/verify', validate(verifyPasswordResetSchema), async (req: Request, res: Response) => {
   const { token } = req.body as { token: string };
   const tokenHash = hashPasswordResetToken(token);

@@ -8,7 +8,8 @@ import { MinimalTeamUser } from "@/types/user"
 const ISS = process.env["JWT_ISSUER"]!
 const AUD = process.env["JWT_AUDIENCE"]!
 
-const ACCESS_TTL_SEC = 15 * 60 // 15 min
+// const ACCESS_TTL_SEC = 15 * 60 // 15 min
+const ACCESS_TTL_SEC = 3 // 15 min
 const REFRESH_TTL_SEC = parseInt(process.env["REFRESH_TOKEN_VALID_DAYS"] ?? '90') * 24 * 60 * 60 // 90 days
 
 // HS256 secret (switch to EdDSA/RS256 for prod if you can)
@@ -106,5 +107,33 @@ export function verifyRefreshToken(presentedToken: string, storedHash: string): 
 
 // --- Cookie helpers ---
 
-// Compute cross-site cookie settings depending on environment
-// Cookie helpers removed: we now pass refresh tokens via JSON, not cookies
+import { Response } from "express"
+
+/**
+ * Attach a refresh token as an httpOnly cookie to the response.
+ * @param res - Express Response object
+ * @param token - The refresh token string
+ * @param expiresAt - Token expiration date
+ */
+export function attachRefreshTokenCookie(res: Response, token: string, expiresAt: Date): void {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: process.env['NODE_ENV'] === 'production' ? 'none' : 'lax',
+    expires: expiresAt,
+    path: '/'
+  })
+}
+
+/**
+ * Clear the refresh token cookie from the response.
+ * @param res - Express Response object
+ */
+export function clearRefreshTokenCookie(res: Response): void {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: process.env['NODE_ENV'] === 'production' ? 'none' : 'lax',
+    path: '/'
+  })
+}
