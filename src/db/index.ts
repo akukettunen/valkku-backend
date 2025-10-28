@@ -1,7 +1,8 @@
 import { Sequelize, QueryTypes, Transaction as SequelizeTransaction } from 'sequelize';
 import * as dotenv from 'dotenv';
+import * as dotenvExpand from 'dotenv-expand';
 
-dotenv.config({ path: `.env` });
+dotenvExpand.expand(dotenv.config());
 
 const isProd = process.env['NODE_ENV'] === 'production';
 
@@ -16,10 +17,10 @@ export const sequelize = isProd
     })
   : new Sequelize({
       dialect: 'mysql',
-      host: process.env['DB_HOST'] || '127.0.0.1',
-      port: parseInt('3306', 10),
-      username: 'root',
-      password: 'root',
+      host: process.env['DB_HOST'] as string,
+      port: parseInt(process.env['DB_PORT'] as string, 10),
+      username: process.env['DB_USERNAME'] as string,
+      password: process.env['DB_PASSWORD'] as string,
       database: process.env['DB_NAME'] as string,
       logging: false,
       // logging: console.log,
@@ -47,8 +48,6 @@ export async function query(sql: string, params?: any[]): Promise<any> {
   }
 
   const [results, metadata] = await sequelize.query(sql, options);
-
-  console.log('results', results);
 
   // For INSERT queries, return an object with insertId for backwards compatibility
   if (sql.trim().toUpperCase().startsWith('INSERT')) {

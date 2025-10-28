@@ -23,18 +23,13 @@ services:
       - .env
     environment:
       NODE_ENV: development
-      DATABASE_URL: "mysql://root:root@db:3306/valkku"
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_USERNAME: root
-      DB_PASSWORD: root
-      DB_NAME: valkku
       PORT: 8333
     ports: [ "8333:8333" ]
     volumes:
       - ./src:/app/src:ro
       - ./nodemon.json:/app/nodemon.json:ro
       - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./.env:/app/.env:ro
     command: ["pnpm", "run", "dev"]
     depends_on:
       db:

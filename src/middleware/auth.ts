@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
+import dotenvExpand from "dotenv-expand";
 import { verifyToken } from "@/utils/tokenHelper"
 import { AppError } from "@/middleware/errors"
 import { PublicTeamUser, TeamUser, TeamUserRole } from "@/types/team"
@@ -8,7 +9,7 @@ import { ROLES } from "@/types/team";
 import { TokenUser } from "@/types/user";
 import { OBJECT_SCOPE } from "@/types/general";
 
-dotenv.config({ quiet: true });
+dotenvExpand.expand(dotenv.config({ quiet: true }));
 
 /**
  * Middleware that requires a valid access token.

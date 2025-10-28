@@ -210,7 +210,7 @@ router.post('/plan-part-type/:teamId', requireSignedIn, validateBasedOnScope('pl
 
   const planPartTypes = await getPlanPartTypes(scope, teamId, userId, false);
 
-  const { metadata: { insertId: id } } = await createPlanPartType(titleObject, color, scope, req.user?.sub!, planPartTypes.length + 1, teamId || null, userId || null) as any;
+  const { insertId: id } = await createPlanPartType(titleObject, color, scope, req.user?.sub!, planPartTypes.length + 1, teamId || null, userId || null) as any;
   const [ eventPlanPartType ] = await getPlanPartTypeById(id) as PlanPartType[];
 
   res.status(201).json({

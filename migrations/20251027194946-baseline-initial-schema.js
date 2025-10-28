@@ -1,9 +1,9 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+require('dotenv-expand').expand(require('dotenv').config());
 
-const dbName = process.env['DB_NAME'] || 'valkku';
+const dbName = process.env['DB_NAME'];
 
 console.log('🔍 Migration Debug:');
 console.log('  DB_NAME:', dbName);
@@ -15,7 +15,7 @@ module.exports = {
 
     try {
       console.log(`📦 Creating database: ${dbName}`);
-      await queryInterface.sequelize.query(`CREATE DATABASE IF NOT EXISTS ${dbName} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      await queryInterface.sequelize.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
       console.log('✅ Database creation completed');
 
       const schemaPath = path.join(__dirname, '../sql/schema.sql');

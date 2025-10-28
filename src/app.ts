@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import { errorHandler, notFound } from '@/middleware/errors';
 import cookieParser from 'cookie-parser';
 
@@ -19,8 +20,8 @@ import planRoutes from '@/routes/plan';
 import devRoutes from '@/routes/dev';
 import calendarRoutes from '@/routes/calendar';
 
-// Load environment variables
-dotenv.config({ quiet: true });
+// Load environment variables with expansion
+dotenvExpand.expand(dotenv.config({ quiet: true }));
 
 const app: Express = express();
 

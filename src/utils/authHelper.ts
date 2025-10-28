@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import argon2 from "argon2"
-dotenv.config({ quiet: true });
+dotenvExpand.expand(dotenv.config({ quiet: true }));
 import { TokenUser } from '@/types/user';
 import { ROLES } from '@/types/team';
 

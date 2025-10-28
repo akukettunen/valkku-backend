@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import { promisePoolEnd } from '@/db';
 import app from './app';
 import { startCronJobs } from '@/cron';
 
-// Load environment variables
-dotenv.config({ quiet: true });
+// Load environment variables with expansion
+dotenvExpand.expand(dotenv.config({ quiet: true }));
 
 const port = parseInt(process.env['PORT'] || '8333', 10);
 
