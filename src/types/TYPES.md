@@ -1,1 +1,3 @@
-This folder is automatically copied to frontend by running scripts/sync-types.sh everytime nodemon runs.
+# Types
+
+This folder contains TypeScript type definitions used by the backend.

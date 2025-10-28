@@ -1,108 +1,87 @@
-import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
+import { Sequelize, QueryTypes, Transaction as SequelizeTransaction } from 'sequelize';
+import * as dotenv from 'dotenv';
 
-dotenv.config({ quiet: true });
+dotenv.config({ path: `.env` });
 
-const databaseConfig = {
-  connectionLimit: 10,
-  host: process.env['DB_HOST']!,
-  user: process.env['DB_USERNAME']!,
-  password: process.env['DB_PASSWORD']!,
-  database: process.env['DB_NAME']!,
-  waitForConnections: true,
-  queueLimit: 0,
-  connectTimeout: 10_000,
-  // Keep idle connections alive to reduce server-side idle timeouts
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10_000,
-  // mysql2 v3 pool idle tuning
-  maxIdle: 10,           // max idle connections, same as connectionLimit by default
-  idleTimeout: 60_000,   // prune idle connections after 60s
-  // Timezone configuration: treat all dates/times as timezone-agnostic
-  timezone: 'Z',         // Force UTC timezone to avoid local conversions
-  dateStrings: true,     // Return DATE/DATETIME as strings instead of Date objects
-} as const;
+const isProd = process.env['NODE_ENV'] === 'production';
 
-const pool = mysql.createPool(databaseConfig);
-
-// mysql2/promise already returns promises, so we can use it directly
-// Add a single retry on transient connection errors after idle periods
-const transientErrorCodes = new Set(['PROTOCOL_CONNECTION_LOST', 'ECONNRESET', 'EPIPE']);
-
-const query = async (sql: string, values?: any[]) => {
-  try {
-    const [rows] = await pool.execute(sql, values);
-    return rows;
-  } catch (error: any) {
-    if (transientErrorCodes.has(error?.code)) {
-      // Retry once by getting a fresh connection
-      const conn = await pool.getConnection();
-      try {
-        const [rows] = await conn.execute(sql, values);
-        return rows;
-      } finally {
-        conn.release();
-      }
-    }
-    throw error;
-  }
-};
-
-const promisePoolEnd = async () => {
-  await pool.end();
-};
-
-// Transaction class for builder pattern
-export class Transaction {
-  private operations: Array<() => Promise<any>> = [];
-  private connection: any = null;
-
-  addTr<T>(operation: (tr: Transaction) => Promise<T>): Transaction {
-    this.operations.push(async () => {
-      return await operation(this);
+export const sequelize = isProd
+  ? new Sequelize(process.env['DATABASE_URL'] as string, {
+      dialect: 'mysql',
+      logging: false,
+      pool: { max: 10, min: 0, idle: 10000, acquire: 30000 },
+      dialectOptions: {
+        ssl: process.env['DB_SSL'] === 'true' ? { rejectUnauthorized: true } : undefined,
+      },
+    })
+  : new Sequelize({
+      dialect: 'mysql',
+      host: process.env['DB_HOST'] || '127.0.0.1',
+      port: parseInt('3306', 10),
+      username: 'root',
+      password: 'root',
+      database: process.env['DB_NAME'] as string,
+      logging: console.log,
+      dialectOptions: {
+        multipleStatements: true,
+      },
     });
-    return this;
+
+// Export Transaction type
+export type Transaction = SequelizeTransaction & {
+  query: (sql: string, params?: any[]) => Promise<any>;
+};
+
+// Raw query function - minimal wrapper around sequelize.query
+export async function query(sql: string, params?: any[]): Promise<any> {
+  const options: any = {
+    type: QueryTypes.RAW,
+    raw: true,
+  };
+
+  if (params && params.length > 0) {
+    // Filter out undefined values and replace with null
+    const cleanParams = params.map(p => p === undefined ? null : p);
+    options.replacements = cleanParams;
   }
 
-  async execute(): Promise<any[]> {
-    this.connection = await pool.getConnection();
+  const [results] = await sequelize.query(sql, options);
+  return results;
+}
 
-    try {
-      await this.connection.beginTransaction();
+// Transaction-aware query wrapper
+export async function withTransaction<T>(
+  callback: (trx: Transaction) => Promise<T>
+): Promise<T> {
+  return await sequelize.transaction(async (t) => {
+    // Add query method to transaction
+    const trx = t as Transaction;
+    trx.query = async (sql: string, params?: any[]) => {
+      const options: any = {
+        type: QueryTypes.RAW,
+        transaction: t,
+        raw: true,
+      };
 
-      const results = [];
-      for (const operation of this.operations) {
-        const result = await operation();
-        results.push(result);
+      if (params && params.length > 0) {
+        // Filter out undefined values and replace with null
+        const cleanParams = params.map(p => p === undefined ? null : p);
+        options.replacements = cleanParams;
       }
 
-      await this.connection.commit();
+      const [results] = await sequelize.query(sql, options);
       return results;
-    } catch (error) {
-      await this.connection.rollback();
-      throw error;
-    } finally {
-      this.connection.release();
-    }
-  }
-
-  // Internal query method for operations
-  async query(sql: string, values?: any[]): Promise<any> {
-    if (!this.connection) {
-      throw new Error('Transaction not started. Call execute() first.');
-    }
-    const [rows] = await this.connection.execute(sql, values);
-    return rows;
-  }
+    };
+    return await callback(trx);
+  });
 }
 
-// Transaction interface for operations
-export interface Transaction {
-  query(sql: string, values?: any[]): Promise<any>;
+// Optionally: export helpers to check the connection at startup
+export async function assertDb() {
+  await sequelize.authenticate();
 }
 
-export {
-  query,
-  promisePoolEnd,
-  databaseConfig
-};
+// Close database connection pool (for graceful shutdown)
+export async function promisePoolEnd() {
+  await sequelize.close();
+}

@@ -6,7 +6,6 @@ import { NORMAL_ROLES } from '@/types/team';
 import { getUserByEmail, getUserById } from '@/db/user';
 import { PublicUser, User } from '@/types/user';
 import { getUserTeam, getUserTeamRole } from '@/db/user';
-import { PREFERRED_LANGUAGE } from '@/types/user';
 import { getPublicUserSelfById } from './userHelper';
 import { getTeamById, getTeamUserRoles } from '@/db/team';
 import { sendTeamInvitationEmail } from '@/utils/emailHelper';
@@ -89,7 +88,6 @@ export const inviteUserToTeamAndSendEmail = async (userId: string, teamId: strin
   const token = crypto.randomBytes(64).toString("base64url")
   const tokenHash = hashInviteToken(token)
   const validUntil = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
-  await query('INSERT INTO email_token_raw_values_delete_in_prod (userId, rawTokenDanger) VALUES (?, ?)', [userId, token])
 
   await query(`
     INSERT INTO team_users (teamId, userId, invitedBy, validUntil, status, tokenHash) VALUES (?, ?, ?, ?, ?, ?)

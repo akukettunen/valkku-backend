@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
-import { AppError } from '@/middleware/errors';
 import { TokenUser } from '@/types/user';
-import { TeamUserRole } from '@/types/team';
 
 // Mock the tokenHelper
 vi.mock('@/utils/tokenHelper', () => ({

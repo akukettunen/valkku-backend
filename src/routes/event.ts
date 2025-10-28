@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { getEventsByTeamIdRange, getEventsByTeamIdDate } from '@/db/event';
-import { Transaction } from '@/db/index';
+import { withTransaction } from '@/db/index';
 import { createEvent, getEventById } from '@/db/event';
 import { createEventSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
@@ -19,13 +19,11 @@ const router: Router = Router();
 
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
-  const tr = new Transaction();
 
-  tr.addTr(async (trx) => {
+  const eventCreateData = await withTransaction(async (trx) => {
     return await createEvent({...req.body, teamId}, req.user?.sub!, trx);
   });
 
-  const [ eventCreateData ] = await tr.execute();
   const id = eventCreateData.insertId;
   const [ event ] = await getEventById(id);
 
@@ -55,9 +53,7 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
   // Edit entire series: use UPDATE to avoid duplicates and preserve id
   if (event.repeats && editMode === 'all') {
-    const tr = new Transaction();
-
-    tr.addTr(async (trx) => {
+    await withTransaction(async (trx) => {
       const merged: any = { ...event, ...updates };
       const toNull = (v: any) => (v === undefined ? null : v);
       return await trx.query(`
@@ -98,8 +94,6 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
         teamId
       ]);
     });
-
-    await tr.execute();
     const [updatedEvent] = await getEventById(eventId);
 
     if (!updatedEvent) {
@@ -115,19 +109,13 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
   // Non-repeating event or unspecified editMode: use DELETE+INSERT strategy
   if (!event.repeats || !editMode) {
-    const tr = new Transaction();
-
-    tr.addTr(async (trx) => {
-      return await trx.query(`
+    await withTransaction(async (trx) => {
+      await trx.query(`
         DELETE FROM events WHERE id = ? AND teamId = ?
       `, [eventId, teamId]);
-    });
 
-    tr.addTr(async (trx) => {
       return await createEvent({ id: eventId, ...updates, teamId }, req.user?.sub!, trx);
     });
-
-    await tr.execute();
     const [updatedEvent] = await getEventById(eventId);
 
     if (!updatedEvent) {
@@ -146,12 +134,10 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
   }
 
   if (editMode === 'this') {
-    var replacedEvent: Event | null = null;
     // Edit single occurrence: create replacement event + exception
     console.log('🔄 Starting editMode=this transaction...');
-    const tr = new Transaction();
 
-    tr.addTr(async (trx) => {
+    const replacedEvent = await withTransaction(async (trx) => {
       console.log('📝 Creating replacement event...');
       // Create replacement event
       const replacementResult = await createEvent(
@@ -180,10 +166,8 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
       );
 
       const replacementEventResult = await getEventById(replacementId) as Event[];
-      replacedEvent = replacementEventResult[0] || null;
+      return replacementEventResult[0] || null;
     });
-
-    await tr.execute();
 
     return res.status(200).json({ success: true, message: 'Occurrence updated', data: replacedEvent });
   }
