@@ -11,6 +11,13 @@ fi
 # Use NODE_ENV if set, otherwise default to development
 ENV=${NODE_ENV:-development}
 
+# Create database if it doesn't exist (for development)
+if [ "$ENV" = "development" ]; then
+  echo "🔧 Creating database if it doesn't exist..."
+  node ./scripts/create-db.js
+  echo "✅ Database check completed"
+fi
+
 echo "Running migrations in $ENV environment..."
 if npx sequelize-cli db:migrate --env $ENV; then
   echo "✅ Migrations completed successfully"

@@ -20,6 +20,7 @@ COPY tsconfig.json ./
 COPY nodemon.json ./
 COPY src ./src
 COPY scripts/entrypoint.sh ./scripts/
+COPY scripts/create-db.js ./scripts/
 
 # Source code will be mounted as volume in docker-compose.dev.yml
 # This COPY is for initial build, but will be overridden by volume mount
@@ -62,6 +63,7 @@ COPY sequelize.config.cjs ./
 COPY migrations ./migrations
 COPY sql ./sql
 COPY scripts/entrypoint.sh ./scripts/
+COPY scripts/create-db.js ./scripts/
 
 # non-root
 RUN addgroup -S app && adduser -S app -G app && chmod +x ./scripts/*.sh
