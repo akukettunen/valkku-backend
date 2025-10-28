@@ -2,6 +2,9 @@
 
 A modern Express.js + TypeScript backend API server.
 
+## Running locally
+docker compose -f docker-compose.dev.yml up --build
+
 ## 🚀 Features
 
 - **Express.js** - Fast, unopinionated web framework
@@ -83,7 +86,7 @@ valkku-backend/
 Create a `.env` file in the root directory:
 
 ```env
-PORT=3000
+PORT=8333
 NODE_ENV=development
 ```
 

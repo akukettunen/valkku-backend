@@ -20,7 +20,7 @@ import { sendWelcomeEmail } from "@/utils/emailHelper";
 import { sendPasswordResetEmail } from "@/utils/emailHelper";
 import crypto from 'crypto';
 import { createPasswordReset, findByTokenHash, markUsedById } from '@/db/passwordReset';
-import { Transaction } from '@/db/index';
+import { withTransaction } from '@/db/index';
 import { revokeAllUserSessions } from '@/db/session';
 
 router.post('/signin', validate(loginSchema), async (req: Request, res: Response) => {
@@ -282,12 +282,10 @@ router.post('/password-reset/confirm', validate(confirmPasswordResetSchema), asy
   const newHash = await hashPassword(newPassword);
 
   // Transactionally set password and mark token used
-  const tr = new Transaction();
-  await tr.addTr(async (trx) => {
+  await withTransaction(async (trx) => {
     await trx.query(`UPDATE users SET passwordHash = ? WHERE id = ?`, [newHash, row.user_id]);
     await trx.query(`UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE id = ?`, [row.id]);
-    return true;
-  }).execute();
+  });
 
   // Revoke all sessions for this user after password change
   await revokeAllUserSessions(row.user_id);

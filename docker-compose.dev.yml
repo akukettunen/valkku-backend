@@ -1,0 +1,44 @@
+# ./docker-compose.dev.yml
+version: "3.9"
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: valkku
+    ports: [ "3306:3306" ]
+    volumes: [ "db_data:/var/lib/mysql" ]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "mysql://root:root@db:3306/valkku"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_NAME: valkku
+      PORT: 8333
+    ports: [ "8333:8333" ]
+    volumes:
+      - ./src:/app/src:ro
+      - ./nodemon.json:/app/nodemon.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+    command: ["pnpm", "run", "dev"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

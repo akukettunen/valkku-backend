@@ -75,7 +75,7 @@ app.set('trust proxy', 1)
 // Basic route
 app.get('/', (_req: Request, res: Response) => {
   res.json({
-    message: 'Welcome to Valkku Backend! 🚀',
+    message: 'Welcome to Valkku Backend API! 🚀',
     timestamp: new Date().toISOString(),
     environment: process.env['NODE_ENV'] || 'development'
   });

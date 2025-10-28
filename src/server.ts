@@ -6,7 +6,7 @@ import { startCronJobs } from '@/cron';
 // Load environment variables
 dotenv.config({ quiet: true });
 
-const port = parseInt(process.env['PORT'] || '3000', 10);
+const port = parseInt(process.env['PORT'] || '8333', 10);
 
 // Start server
 const server = app.listen(port, '0.0.0.0', () => {

@@ -9,7 +9,7 @@ import { EVENT_PLAN_PART_SCOPE, PlanPartType, LocalizationObject, Plan, PlanPart
 import { RowDataPacket } from 'mysql2';
 import { updatePlanPartType, deletePlanPartType, getPlanPartTypes, getPlanPartTypeById, createPlanPartType, updatePlanPartTypePosition } from '@/db/event';
 import { createPlanSchema } from '@/schemas/plan';
-import { Transaction } from '@/db/index';
+import { withTransaction } from '@/db/index';
 import { getPlanById, getPlanByEventId } from '@/utils/planHelper';
 import { requireScope } from '@/middleware/auth';
 
@@ -35,60 +35,53 @@ router.post('/', requireSignedIn, validate(createPlanSchema), validateBasedOnSco
     items
   } = req.body as Plan & { parts: PlanPart[], items: PlanPartItem[] };
 
-  const tr = new Transaction();
-  var planId: number;
-
   console.log('req.body', req.body);
 
-  tr.addTr(async (trx) => {
-    return await trx.query(`
+  const insertData = await withTransaction(async (trx) => {
+    // Delete existing plan
+    await trx.query(`
       DELETE FROM plans WHERE eventId = ? AND teamId = ?
     `, [eventId, teamId]);
-  });
 
-  // CREATE PLAN
-  tr.addTr(async (trx) => {
+    // CREATE PLAN
     const res = await trx.query(
       `INSERT INTO plans (title, description, teamId, copyOfPlanId, eventId, scope)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [title ?? null, description ?? null, teamId, copyOfPlanId ?? null, eventId ?? null, scope]
     );
-    planId = res.insertId;
+    const planId = res.insertId;
     console.log('PLAN ID HERE!', planId);
-    return res;
-  });
 
-  // CREATE PLAN PARTS
-  tr.addTr(async (trx) => {
-    if (!parts?.length) return;
-    for (const part of parts) {
-      await trx.query(
-        `INSERT INTO plan_parts (id, planId, typeId, durationInMinutes, position) VALUES (?, ?, ?, ?, ?)`,
-        [part.id, planId, part.typeId, part.durationInMinutes ?? null, part.position]
-      );
-    }
-  });
-
-  // ADD PLAN ITEMS
-  tr.addTr(async (trx) => {
-    if (!items?.length) return;
-    for (const item of items) {
-      console.log('ITEM', item);
-      await trx.query(
-        `INSERT INTO plan_part_items (id, planId, partId, type, position) VALUES (?, ?, ?, ?, ?)`,
-        [item.id, item.partId ? null : planId, item.partId ?? null, item.type, item.position]
-      );
-
-      if(item.type === 'text') {
+    // CREATE PLAN PARTS
+    if (parts?.length) {
+      for (const part of parts) {
         await trx.query(
-          `INSERT INTO plan_part_item_texts (planPartItemId, text) VALUES (?, ?)`,
-          [item.id, item.item?.text ?? null]
+          `INSERT INTO plan_parts (id, planId, typeId, durationInMinutes, position) VALUES (?, ?, ?, ?, ?)`,
+          [part.id, planId, part.typeId, part.durationInMinutes ?? null, part.position]
         );
       }
     }
-  });
 
-  const [ deleteData, insertData ] = await tr.execute();
+    // ADD PLAN ITEMS
+    if (items?.length) {
+      for (const item of items) {
+        console.log('ITEM', item);
+        await trx.query(
+          `INSERT INTO plan_part_items (id, planId, partId, type, position) VALUES (?, ?, ?, ?, ?)`,
+          [item.id, item.partId ? null : planId, item.partId ?? null, item.type, item.position]
+        );
+
+        if(item.type === 'text') {
+          await trx.query(
+            `INSERT INTO plan_part_item_texts (planPartItemId, text) VALUES (?, ?)`,
+            [item.id, item.item?.text ?? null]
+          );
+        }
+      }
+    }
+
+    return res;
+  });
 
   const plan = await getPlanById(insertData.insertId);
 
