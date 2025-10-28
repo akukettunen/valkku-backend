@@ -5,8 +5,7 @@ This document explains how to deploy the backend to common targets in a *platfor
 
 Prereqs (all targets)
 ---------------------
-- Built Docker image (or use GitHub Actions to build/push to GHCR):
-  ghcr.io/<org-or-user>/<repo>/valkku-backend:latest
+- Built Docker image (or use Heroku Container Registry)
 - A reachable **MySQL** instance for your environment.
 - One environment variable: **DATABASE_URL**
   Example: mysql://USER:PASS@HOST:3306/DBNAME?ssl=true
@@ -29,7 +28,27 @@ Environment Variables
 - DATABASE_URL  (required)  mysql://USER:PASS@HOST:PORT/DB
 - PORT          (optional)  default 3000
 ----------------------------------------
-A) Heroku (Container stacks or buildpacks)
+A) Heroku Container Registry (Recommended)
+----------------------------------------
+
+Option 1: Container Registry (Docker image)
+1. Install Heroku CLI: `npm install -g heroku`
+2. Login: `heroku login` and `heroku container:login`
+3. Create app: `heroku create your-app-name`
+4. Set environment variables:
+   - `heroku config:set DATABASE_URL="mysql://USER:PASS@HOST:3306/DBNAME?ssl=true" -a your-app-name`
+   - `heroku config:set JWT_SECRET="your-secret" -a your-app-name`
+   - `heroku config:set NODE_ENV=production -a your-app-name`
+   - Add other required env vars (AWS_SES_REGION, etc.)
+5. Deploy:
+   - `heroku container:push web -a your-app-name`
+   - `heroku container:release web -a your-app-name`
+
+The Dockerfile is configured to build for x86_64 architecture automatically.
+Migrations run automatically via the entrypoint script.
+
+----------------------------------------
+B) Heroku (Buildpacks - Alternative)
 ----------------------------------------
 
 Option 1: Buildpacks (simple, Heroku builds from repo)
