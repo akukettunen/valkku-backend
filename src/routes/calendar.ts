@@ -9,7 +9,6 @@ import { validate } from '@/middleware/validation';
 import { createId } from '@/utils/userHelper';
 import { getTeamEvents } from '@/db/event';
 import { EventInput, eventsToICS } from '@/utils/calendarHelper';
-import { createHash } from 'crypto';
 
 const router: Router = Router();
 
@@ -113,39 +112,18 @@ router.get("/:token", async (req: Request, res: Response) => {
     locale: user.preferredLanguage
   });
 
-  // 5. Conditional caching (preferred by calendar clients)
-  const etag = `W/"${createHash("sha1").update(ics).digest("hex")}"`;
-  const newestUpdatedAt = events
-    .map(e => (e.updatedAt ? new Date(e.updatedAt).getTime() : 0))
-    .reduce((a, b) => Math.max(a, b), 0);
-  const lastModified = new Date(newestUpdatedAt || Date.now()).toUTCString();
-
-  const ifNoneMatch = req.headers["if-none-match"];
-  const ifModifiedSince = req.headers["if-modified-since"];
-  const modifiedSinceOk = ifModifiedSince ? (new Date(ifModifiedSince).getTime() >= new Date(lastModified).getTime()) : false;
-
-  if (ifNoneMatch === etag || modifiedSinceOk) {
-    res
-      .status(304)
-      .set({
-        ETag: etag,
-        "Cache-Control": "public, max-age=60, must-revalidate",
-        "Last-Modified": lastModified,
-      })
-      .end();
-    return;
-  }
-
-  // 6. Respond with ICS file
+  // 5. Always respond with fresh content (no caching)
   res
     .status(200)
     .set({
       "Content-Type": "text/calendar; charset=utf-8",
       // Prefer inline for subscriptions
       "Content-Disposition": `inline; filename="team-${sub.teamId}.ics"`,
-      "Cache-Control": "public, max-age=60, must-revalidate",
-      ETag: etag,
-      "Last-Modified": lastModified,
+      "Cache-Control": "no-cache, no-store, must-revalidate, private",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "Last-Modified": new Date().toUTCString(),
+      "ETag": `"${Date.now()}"`,
     })
     .send(ics);
 });
