@@ -21,7 +21,8 @@ export const sequelize = isProd
       username: 'root',
       password: 'root',
       database: process.env['DB_NAME'] as string,
-      logging: console.log,
+      logging: false,
+      // logging: console.log,
       dialectOptions: {
         multipleStatements: true,
       },
@@ -45,7 +46,16 @@ export async function query(sql: string, params?: any[]): Promise<any> {
     options.replacements = cleanParams;
   }
 
-  const [results] = await sequelize.query(sql, options);
+  const [results, metadata] = await sequelize.query(sql, options);
+
+  console.log('results', results);
+
+  // For INSERT queries, return an object with insertId for backwards compatibility
+  if (sql.trim().toUpperCase().startsWith('INSERT')) {
+    return { insertId: results };
+  }
+
+  // For SELECT queries, return the results array
   return results;
 }
 
@@ -69,7 +79,14 @@ export async function withTransaction<T>(
         options.replacements = cleanParams;
       }
 
-      const [results] = await sequelize.query(sql, options);
+      const [results, metadata] = await sequelize.query(sql, options);
+
+      // For INSERT queries, return an object with insertId for backwards compatibility
+      if (sql.trim().toUpperCase().startsWith('INSERT')) {
+        return { insertId: results };
+      }
+
+      // For SELECT queries, return the results array
       return results;
     };
     return await callback(trx);

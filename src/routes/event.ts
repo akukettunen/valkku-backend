@@ -20,9 +20,7 @@ const router: Router = Router();
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
 
-  const eventCreateData = await withTransaction(async (trx) => {
-    return await createEvent({...req.body, teamId}, req.user?.sub!, trx);
-  });
+  const eventCreateData = await createEvent({...req.body, teamId}, req.user?.sub!);
 
   const id = eventCreateData.insertId;
   const [ event ] = await getEventById(id);

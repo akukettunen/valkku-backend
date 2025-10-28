@@ -52,7 +52,7 @@ router.post('/team/:teamId', requireSignedIn, requireScope('location:create', 't
     throw new AppError('Location already exists', 400, 'location_already_exists');
   }
 
-  const { insertId } = await query(`
+  const { metadata: { insertId } } = await query(`
     INSERT INTO locations (name, formattedAddress, addressLine1, addressLine2, city, state, zip, country, lat, lon, provider, providerPlaceId, teamId)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [name, formattedAddress, addressLine1, addressLine2, city, state, zip, country, lat, lon, provider, providerPlaceId, teamId]) as any;

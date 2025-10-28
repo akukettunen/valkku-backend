@@ -1,6 +1,6 @@
 # ./Dockerfile
 # --- development stage ---
-FROM node:22-alpine AS development
+FROM --platform=linux/amd64 node:22-alpine AS development
 WORKDIR /app
 
 # pnpm
@@ -14,6 +14,7 @@ RUN pnpm install --frozen-lockfile
 COPY .sequelizerc ./
 COPY sequelize.config.cjs ./
 COPY migrations ./migrations
+COPY seeders ./seeders
 COPY sql ./sql
 COPY tsconfig.json ./
 COPY nodemon.json ./
@@ -30,7 +31,7 @@ ENTRYPOINT ["./scripts/entrypoint.sh"]
 CMD ["pnpm", "run", "dev"]
 
 # --- build stage ---
-FROM node:22-alpine AS build
+FROM --platform=linux/amd64 node:22-alpine AS build
 WORKDIR /app
 
 # pnpm
@@ -45,7 +46,7 @@ COPY . .
 RUN pnpm run build
 
 # --- production runtime stage ---
-FROM node:22-alpine AS production
+FROM --platform=linux/amd64 node:22-alpine AS production
 WORKDIR /app
 ENV PORT=8333
 

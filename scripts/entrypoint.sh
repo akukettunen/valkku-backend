@@ -18,5 +18,17 @@ else
   echo "⚠️  Migrations failed or already applied (continuing anyway)"
 fi
 
+# Run seeders only in development
+if [ "$ENV" = "development" ]; then
+  echo "🌱 Running seeders in development environment..."
+  if npx sequelize-cli db:seed:all --env $ENV; then
+    echo "✅ Seeders completed successfully"
+  else
+    echo "⚠️  Seeders failed or already applied (continuing anyway)"
+  fi
+else
+  echo "⏭️  Skipping seeders - not in development environment"
+fi
+
 echo "Starting app..."
 exec "$@"

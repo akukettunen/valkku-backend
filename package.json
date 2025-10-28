@@ -11,7 +11,9 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "heroku-postbuild": "pnpm run build"
+    "heroku-postbuild": "pnpm run build",
+    "db:seed": "npx sequelize-cli db:seed:all",
+    "db:seed:undo": "npx sequelize-cli db:seed:undo:all"
   },
   "author": "",
   "license": "ISC",
