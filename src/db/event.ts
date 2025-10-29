@@ -81,15 +81,21 @@ export const getEventsByTeamIdRange = async (teamId: string, startDate: string, 
   return result as (PublicEvent & { addedByName: string, addedByEmail: string, addedById: string })[];
 };
 
-export const getTeamEvents = async (teamId: string) => {
+export const getTeamEvents = async (teamId: string, userId?: string) => {
   const result = await query(`
-    SELECT *, locations.*, events.id as id, locations.id as locationId,
-      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd
+    SELECT
+      events.*,
+      locations.*,
+      events.id as id,
+      locations.id as locationId,
+      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+      user_event_attendances.attends
     FROM events
     LEFT JOIN locations ON events.locationId = locations.id
+    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.repeatId = events.eventDate AND user_event_attendances.userId = ?)
     WHERE events.teamId = ?
-  `, [teamId]);
-  return result as Event[];
+  `, [userId, teamId]);
+  return result as (Event & { attends: boolean })[];
 };
 
 export const getPlanPartTypeById = async (id: string) => {

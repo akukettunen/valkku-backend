@@ -44,6 +44,7 @@ export type PublicEvent = Omit<Event, 'ownNotes' | 'coachesNotes'> & {
   location?: Location | null;
   plan?: Plan | null;
   createdByName?: string;
+  attends?: boolean;
 }
 
 export interface EventSettings {

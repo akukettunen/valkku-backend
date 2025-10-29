@@ -313,7 +313,6 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
   try {
     if (date) {
       // Single date - need to handle repeats that land on this date
-      console.log(`\n🔍 Fetching events for: ${date}`);
       const allEvents = await getTeamEvents(teamId);
 
       // Separate events with repeats from non-repeating events

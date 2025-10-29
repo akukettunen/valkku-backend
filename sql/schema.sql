@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   PRIMARY KEY (`jti`),
   KEY `userId` (`userId`),
   KEY `expiresAt` (`expiresAt`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.teams definition
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS `teams` (
   `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.users definition
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `superAdmin` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `ux_users_emailLc` (`emailLc`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.cal_subscriptions definition
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS `cal_subscriptions` (
   CONSTRAINT `cal_subscriptions_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cal_subscriptions_ibfk_2` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cal_subscriptions_ibfk_3` FOREIGN KEY (`guardianOfId`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.locations definition
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS `locations` (
   PRIMARY KEY (`id`),
   KEY `fk_locations_team` (`teamId`),
   CONSTRAINT `fk_locations_team` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.password_resets definition
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   UNIQUE KEY `uniq_token_hash` (`token_hash`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `password_resets_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.plan_part_types definition
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `plan_part_types` (
   CONSTRAINT `fk_created_by` FOREIGN KEY (`createdById`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_team` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.team_user_roles definition
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS `team_user_roles` (
   CONSTRAINT `fk_tur_guardian` FOREIGN KEY (`guardianOf`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_tur_team` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_tur_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.team_users definition
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `team_users` (
   CONSTRAINT `fk_teamUsers_team` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_teamUsers_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chk_valid_until_future` CHECK ((`validUntil` > `createdAt`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.events definition
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `events` (
   CONSTRAINT `events_ibfk_1` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `events_ibfk_2` FOREIGN KEY (`locationId`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_3` FOREIGN KEY (`createdById`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=107 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=107 DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.plans definition
@@ -225,7 +225,7 @@ CREATE TABLE IF NOT EXISTS `plans` (
   CONSTRAINT `plans_ibfk_1` FOREIGN KEY (`teamId`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plans_ibfk_2` FOREIGN KEY (`eventId`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plans_ibfk_3` FOREIGN KEY (`copyOfPlanId`) REFERENCES `plans` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=71 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=71 DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.event_exceptions definition
@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS `event_exceptions` (
   KEY `fk_exception_replacement` (`replacementEventId`),
   CONSTRAINT `fk_exception_replacement` FOREIGN KEY (`replacementEventId`) REFERENCES `events` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_exception_series` FOREIGN KEY (`eventId`) REFERENCES `events` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.plan_parts definition
@@ -259,7 +259,7 @@ CREATE TABLE IF NOT EXISTS `plan_parts` (
   KEY `planId` (`planId`),
   CONSTRAINT `plan_parts_ibfk_1` FOREIGN KEY (`typeId`) REFERENCES `plan_part_types` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plan_parts_ibfk_2` FOREIGN KEY (`planId`) REFERENCES `plans` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.plan_part_items definition
@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS `plan_part_items` (
   KEY `planId` (`planId`),
   CONSTRAINT `plan_part_items_ibfk_1` FOREIGN KEY (`partId`) REFERENCES `plan_parts` (`id`) ON DELETE CASCADE,
   CONSTRAINT `plan_part_items_ibfk_2` FOREIGN KEY (`planId`) REFERENCES `plans` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- valkku.plan_part_item_texts definition
@@ -289,4 +289,4 @@ CREATE TABLE IF NOT EXISTS `plan_part_item_texts` (
   `updatedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`planPartItemId`),
   CONSTRAINT `plan_part_item_texts_ibfk_1` FOREIGN KEY (`planPartItemId`) REFERENCES `plan_part_items` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

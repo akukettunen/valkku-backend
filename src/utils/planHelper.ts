@@ -11,8 +11,6 @@ export const getPlanByEventId = async (eventId: number, teamId?: string) => {
     fetchedPlan = await query(`SELECT id FROM plans WHERE eventId = ?`, [eventId]) as Plan[];
   }
 
-  console.log('fetchedPlan', fetchedPlan);
-
   if(!fetchedPlan[0]) {
     return null;
   }

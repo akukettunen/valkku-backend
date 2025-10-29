@@ -17,7 +17,8 @@ const createCalSubscriptionSchema = z.object({
   teamId: z.string(),
   role: z.enum(['owner', 'admin', 'coach', 'athlete', 'guardian']),
   guardianOfId: z.string().nullable()
-})
+});
+
 router.post('/create-subscription', requireSignedIn, validate(createCalSubscriptionSchema), async (req: Request, res: Response) => {
   const { userId, teamId, role, guardianOfId } = req.body as { userId: string, teamId: string, role: ROLES, guardianOfId: string };
 

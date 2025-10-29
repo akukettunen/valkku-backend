@@ -215,10 +215,17 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
   const { recurrenceDate } = req.query as { recurrenceDate?: string };
 
   const [ event ] = await query(`
-    SELECT events.*, users.email as createdByEmail, users.fullName as createdByName FROM events
+    SELECT events.*, users.email as createdByEmail, users.fullName as createdByName, user_event_attendances.attends FROM events
     LEFT JOIN users ON events.createdById = users.id
+    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.repeatId = ? AND user_event_attendances.userId = ?)
     WHERE events.id = ? AND events.teamId = ?
-  `, [eventId, teamId]) as PublicEvent[];
+  `, [recurrenceDate, req.user!.sub, eventId, teamId]) as PublicEvent[];
+
+  // const [ event ] = await query(`
+  //   SELECT events.*, users.email as createdByEmail, users.fullName as createdByName FROM events
+  //   LEFT JOIN users ON events.createdById = users.id
+  //   WHERE events.id = ? AND events.teamId = ?
+  // `, [eventId, teamId]) as PublicEvent[];
 
   if(!event) {
     throw new AppError('Event not found', 404, 'event_not_found');
@@ -337,6 +344,56 @@ router.delete('/:eventId/team/:teamId', requireSignedIn, requireScope('event:del
   // Delete entire event/series
   await query(`DELETE FROM events WHERE id = ?`, [eventId]);
   return res.json({ success: true, message: 'Event deleted' });
+});
+
+router.post('/:eventId/attendance', requireSignedIn, requireScope('event:attendance:create', 'individual'), async (req: Request, res: Response) => {
+  const { eventId } = req.params as { eventId: string; teamId: string };
+  const { attendance, repeatId } = req.body as { attendance: boolean; repeatId?: string };
+
+  if(attendance === undefined) {
+    throw new AppError('Attendance is required', 400, 'attendance_required');
+  }
+
+  // Verify the event exists and user has access to it
+  const [event] = await getEventById(eventId);
+  if (!event) {
+    throw new AppError('Event not found', 404, 'event_not_found');
+  }
+
+  const [ user ] = await query(`
+    SELECT * FROM users
+    LEFT JOIN team_users ON users.id = team_users.userId
+    LEFT JOIN events ON events.teamId = team_users.teamId
+    WHERE events.id = ? AND users.id = ?
+  `, [eventId, req.user!.sub]);
+
+  console.log(user);
+
+  if(!user) {
+    throw new AppError('User not found', 404, 'unauthorized');
+  }
+
+  // For recurring events, use the provided repeatId or the event's date
+  const attendanceRepeatId = repeatId || event.eventDate;
+
+  // Create or update attendance using raw SQL with ON DUPLICATE KEY UPDATE
+  await query(`
+    INSERT INTO user_event_attendances (userId, eventId, repeatId, attends)
+    VALUES (?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      attends = VALUES(attends),
+      updatedAt = CURRENT_TIMESTAMP
+  `, [req.user!.sub, eventId, attendanceRepeatId, attendance]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Attendance updated successfully',
+    data: {
+      eventId,
+      repeatId: attendanceRepeatId,
+      attendance
+    }
+  });
 });
 
 export default router;
