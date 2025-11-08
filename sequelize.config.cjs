@@ -37,7 +37,9 @@ module.exports = {
     use_env_variable: 'DATABASE_URL',
     dialect: 'mysql',
     dialectOptions: {
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : false,
+      ssl: process.env.DB_SSL === 'false' ? false : {
+        rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+      },
       multipleStatements: true,
     },
     logging: false,
