@@ -1,7 +1,6 @@
 import { getEventsByTeamIdDate, getEventsByTeamIdRange, getTeamEvents, getEventById } from "@/db/event";
 import { AppError } from "@/middleware/errors";
 import type { Event } from "@/types/event";
-import { getEventExceptionsInRange } from "@/db/eventException";
 
 /**
  * Expand repeat events into individual instances within a date range
@@ -254,14 +253,14 @@ const applyExceptions = async (
   const allExceptions = new Map<string, any>();
   const replacementIds = new Set<number>();
   for (const baseId of eventsByBaseId.keys()) {
-    const exceptions = await getEventExceptionsInRange(baseId, startDate, endDate);
-    for (const exc of exceptions) {
-      const key = `${exc.eventId}-${exc.recurrenceDate}`;
-      allExceptions.set(key, exc);
-      if (exc.replacementEventId) {
-        replacementIds.add(exc.replacementEventId);
-      }
-    }
+    // const exceptions = await getEventExceptionsInRange(baseId, startDate, endDate);
+    // for (const exc of exceptions) {
+    //   const key = `${exc.eventId}-${exc.recurrenceDate}`;
+    //   allExceptions.set(key, exc);
+    //   if (exc.replacementEventId) {
+    //     replacementIds.add(exc.replacementEventId);
+    //   }
+    // }
   }
 
   // Filter and replace
