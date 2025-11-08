@@ -6,27 +6,47 @@ export const createPlanPartItemTextSchema = z.object({
 
 export const createPlanPartItemSchema = z.object({
   id: z.string(),
-  eventId: z.number(),
   partId: z.string(),
   position: z.number(),
   type: z.enum(['audio', 'video', 'text', 'image', 'file', 'rest']),
-  item: createPlanPartItemTextSchema
+  nodeType: z.enum(['item']).optional(),
+  item: createPlanPartItemTextSchema.optional(),
+  __flash: z.boolean().optional()
 });
 
 export const createPlanPartSchema = z.object({
-  id: z.string(),
-  durationInMinutes: z.number().nullable().optional(),
-  typeId: z.number().nullable().optional(),
+  id: z.string().length(21),
+  title: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  durationInMinutes: z.number(),
+  typeId: z.number(),
   position: z.number(),
-  nodeType: z.enum(['part', 'item'])
+  nodeType: z.enum(['part']).optional(),
+  color: z.string().optional(),
+  type: z.any().optional(),
+  items: z.array(z.any()).optional(),
+  __flash: z.boolean().optional()
+});
+
+export const updatePlanPartSchema = z.object({
+  title: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  durationInMinutes: z.number().optional(),
+  typeId: z.number().optional(),
+  position: z.number().optional(),
+  showInLibrary: z.boolean().optional(),
+  items: z.array(createPlanPartItemSchema).optional()
 });
 
 export const createPlanSchema = z.object({
+  id: z.number().nullable().optional(),
   title: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   teamId: z.string(),
+  eventId: z.number().nullable().optional(),
   copyOfPlanId: z.number().nullable().optional(),
   scope: z.enum(['global', 'club', 'team', 'user']),
-  eventId: z.number().nullable().optional(),
-  parts: z.array(createPlanPartSchema).or(z.array(createPlanPartItemSchema))
+  showInLibrary: z.boolean().optional(),
+  parts: z.array(createPlanPartSchema),
+  items: z.array(createPlanPartItemSchema)
 });

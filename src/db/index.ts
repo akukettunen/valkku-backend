@@ -1,7 +1,8 @@
 import { Sequelize, QueryTypes, Transaction as SequelizeTransaction } from 'sequelize';
 import * as dotenv from 'dotenv';
 import * as dotenvExpand from 'dotenv-expand';
-
+import { initModels } from '@/models/init-models';
+export * from '@/models/init-models';
 dotenvExpand.expand(dotenv.config());
 
 const isProd = process.env['NODE_ENV'] === 'production';
@@ -28,6 +29,9 @@ export const sequelize = isProd
         multipleStatements: true,
       },
     });
+
+// Initialize models
+export const models = initModels(sequelize);
 
 // Export Transaction type
 export type Transaction = SequelizeTransaction & {

@@ -3,52 +3,34 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up (queryInterface, Sequelize) {
-    await queryInterface.createTable('user_event_attendances', {
-      userId: {
-        type: Sequelize.STRING(21),
-        allowNull: false,
-        primaryKey: true,
-        references: {
-          model: 'users',
-          key: 'id'
-        },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
+    // Create user_event_attendances table using raw SQL to ensure proper charset/collation
+    await queryInterface.sequelize.query(`
+      CREATE TABLE user_event_attendances (
+        userId VARCHAR(21) CHARACTER SET utf8mb4 NOT NULL,
+        eventId INT NOT NULL,
+        repeatId DATE NOT NULL,
+        attends BOOLEAN NOT NULL,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (userId, eventId, repeatId),
+        CONSTRAINT user_event_attendances_ibfk_1 FOREIGN KEY (userId) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+        CONSTRAINT user_event_attendances_ibfk_2 FOREIGN KEY (eventId) REFERENCES events(id) ON UPDATE CASCADE ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await queryInterface.addColumn('events', 'baseEventId', {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'events',
+        key: 'id'
       },
-      eventId: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        primaryKey: true,
-        references: {
-          model: 'events',
-          key: 'id'
-        },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
-      },
-      repeatId: {
-        type: Sequelize.DATEONLY,
-        allowNull: false,
-        primaryKey: true
-      },
-      attends: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false
-      },
-      createdAt: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-      },
-      updatedAt: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
-      }
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE'
     });
   },
-
   async down (queryInterface, Sequelize) {
     await queryInterface.dropTable('user_event_attendances');
+    await queryInterface.removeColumn('events', 'baseEventId');
   }
-};
+}

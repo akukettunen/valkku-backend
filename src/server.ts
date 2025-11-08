@@ -14,8 +14,10 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`📱 Environment: ${process.env['NODE_ENV'] || 'development'}`);
   console.log(`🌐 Health check: http://localhost:${port}/health`);
-  // Start background cron jobs
-  startCronJobs();
+  // Start background cron jobs (non-blocking)
+  Promise.resolve()
+    .then(() => startCronJobs())
+    .catch((err) => console.error('[cron] start error', err));
 });
 
 // Graceful shutdown handlers

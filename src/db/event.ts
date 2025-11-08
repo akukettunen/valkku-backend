@@ -22,13 +22,16 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     repeatsOn,
     repeatsUntilUnixSec,
     status,
-    durationInMinutes
+    durationInMinutes,
+    baseEventId,
+    planId,
+    forAllAthletes
   } = event;
 
   const toNull = (v: any) => (v === undefined ? null : v);
   const exec = trx ? trx.query.bind(trx) : query;
   const result = await exec(`
-    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes, baseEventId, planId, forAllAthletes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     toNull(id),
     teamId,
@@ -47,7 +50,10 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     toNull(repeatsUntilUnixSec),
     toNull(status) || 'published',
     createdById,
-    toNull(durationInMinutes)
+    toNull(durationInMinutes),
+    toNull(baseEventId),
+    toNull(planId),
+    forAllAthletes !== undefined ? forAllAthletes : true
   ]);
   return result;
 };
@@ -92,8 +98,9 @@ export const getTeamEvents = async (teamId: string, userId?: string) => {
       user_event_attendances.attends
     FROM events
     LEFT JOIN locations ON events.locationId = locations.id
-    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.repeatId = events.eventDate AND user_event_attendances.userId = ?)
+    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
     WHERE events.teamId = ?
+    ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
   `, [userId, teamId]);
   return result as (Event & { attends: boolean })[];
 };

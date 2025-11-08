@@ -38,10 +38,15 @@ export default {
 
     "user:read": ["owner", "admin", "coach"],
 
-    "plan:post": ["owner", "admin", "coach"],
+    "plan:create": ["owner", "admin", "coach"],
     "plan:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "plan:update": ["owner", "admin", "coach"],
     "plan:delete": ["owner", "admin", "coach"],
+
+    "plan-part:create": ["owner", "admin", "coach"],
+    "plan-part:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "plan-part:update": ["owner", "admin", "coach"],
+    "plan-part:delete": ["owner", "admin", "coach"],
 
     "location:create": ["owner", "admin"],
     "location:read": ["owner", "admin", "athlete", "guardian", "coach"],
@@ -61,10 +66,15 @@ export default {
     "plan-part-type:create": ["self", "guardian-as-athlete"],
     "plan-part-type:update": ["self", "guardian-as-athlete"],
 
-    "plan:post": ["self", "guardian-as-athlete"],
+    "plan:create": ["self", "guardian-as-athlete"],
     "plan:read": ["self", "guardian-as-athlete"],
     "plan:update": ["self", "guardian-as-athlete"],
     "plan:delete": ["self", "guardian-as-athlete"],
+
+    "plan-part:create": ["self", "guardian-as-athlete"],
+    "plan-part:read": ["self", "guardian-as-athlete"],
+    "plan-part:update": ["self", "guardian-as-athlete"],
+    "plan-part:delete": ["self", "guardian-as-athlete"],
 
     "user:read": ["self", "guardian-as-athlete"],
   }

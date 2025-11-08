@@ -1,7 +1,7 @@
 # ./Makefile
 SHELL := /bin/bash
 
-.PHONY: dev up down logs reset build image run migrate
+.PHONY: dev up down logs reset build image run migrate models models-dev models-docker models-clean
 
 dev:        ## Run dev stack (app + MySQL) via Compose with hot reload
 	docker compose -f docker-compose.dev.yml up --build
@@ -29,3 +29,6 @@ run:        ## Run production image (needs DATABASE_URL)
 
 migrate:    ## Run migrations against DATABASE_URL
 	NODE_ENV=production DATABASE_URL=$(DATABASE_URL) npx sequelize-cli db:migrate --env production
+	@echo "🧹 Cleaning models directory..."
+	@rm -rf src/models
+	@echo "✅ Models directory cleaned"

@@ -1,21 +1,23 @@
-import z from "zod";
+import { z } from 'zod'
 
 export const createEventSchema = z.object({
-  title: z.string(),
-  type: z.string(),
-  eventDate: z.string(),
-  notes: z.string().nullable().optional(),
-  coachesNotes: z.string().nullable().optional(),
-  ownNotes: z.string().nullable().optional(),
+  title: z.string().max(400),
+  type: z.enum(['practise', 'match', 'meeting', 'self_training', 'other_event', 'mental']),
+  eventDate: z.string(), // Date in YYYY-MM-DD format
+  notes: z.string().max(1000).nullable().optional(),
+  coachesNotes: z.string().max(1000).nullable().optional(),
+  ownNotes: z.string().max(1000).nullable().optional(),
   locationId: z.number().nullable().optional(),
   startTimeUnixSec: z.number().nullable().optional(),
   endTimeUnixSec: z.number().nullable().optional(),
   durationInMinutes: z.number().positive().nullable().optional(),
-  timezone: z.string().optional().default('Europe/Helsinki'), // IANA timezone identifier
-  repeats: z.enum(['daily', 'weekly', 'monthly']).optional(),
-  repeatsOn: z.string().nullable().optional(),
-  repeatsUntilUnixSec: z.number().optional().nullable(),
-  status: z.string().optional().nullable()
+  timezone: z.string().max(50).optional().default('Europe/Helsinki'), // IANA timezone identifier
+  repeats: z.enum(['weekly']).nullable().optional(), // Only weekly supported for now
+  repeatsOn: z.string().max(7).nullable().optional(),
+  repeatsUntilUnixSec: z.number().nullable().optional(),
+  status: z.enum(['draft', 'published', 'archived']).optional().default('published'),
+  planId: z.number().nullable().optional(),
+  baseEventId: z.number().nullable().optional(),
 }).superRefine((data, ctx) => {
   const hasStart = data.startTimeUnixSec != null;
   const hasEnd = data.endTimeUnixSec != null;
@@ -39,8 +41,9 @@ export const createEventSchema = z.object({
     }
   }
 
-  if (data.repeats === 'daily' && (data.repeatsOn == null || data.repeatsOn === '')) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'repeatsOn required for weekly repeats', path: ['repeatsOn'] });
+  // If event repeats, repeatsUntilUnixSec is required
+  if (data.repeats != null && data.repeatsUntilUnixSec == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'repeatsUntilUnixSec is required when repeats is set', path: ['repeatsUntilUnixSec'] });
   }
 })
 

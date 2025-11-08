@@ -1,43 +1,157 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
-import { getEventsByTeamIdRange, getEventsByTeamIdDate } from '@/db/event';
 import { withTransaction } from '@/db/index';
 import { createEvent, getEventById } from '@/db/event';
 import { createEventSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
 import { query } from '@/db/index';
-import { PublicEvent } from '@/types/event';
-import { Location } from './location';
 import { hasRoleInTeam } from '@/utils/authHelper';
 import { getPlanByEventId } from '@/utils/planHelper';
-import { fetchTeamEvents } from '@/utils/eventHelper';
-import { createEventException, getEventException } from '@/db/eventException';
 import { Event } from '@/types/event';
+import { models } from '@/db/index';
+import { Op } from 'sequelize';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const router: Router = Router();
 
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
+  const eventData = req.body;
 
-  const eventCreateData = await createEvent({...req.body, teamId}, req.user?.sub!);
+  // If this is a weekly repeating event, generate all occurrences and save them
+  if (eventData.repeats === 'weekly' && eventData.repeatsUntilUnixSec) {
+    let occurrencesCount = 0;
+    const firstEvent = await withTransaction(async (trx) => {
+      const startDate = new Date(eventData.eventDate + 'T00:00:00.000Z');
+      const endDate = new Date(eventData.repeatsUntilUnixSec * 1000);
+      const occurrences: any[] = [];
 
-  const id = eventCreateData.insertId;
-  const [ event ] = await getEventById(id);
+      // Helper function to recalculate Unix timestamp for a new date
+      // Properly handles DST transitions using date-fns-tz
+      const recomputeUnix = (baseDate: Date, originalUnix: number | null | undefined, timezone: string): number | null => {
+        if (!originalUnix) return originalUnix || null;
 
-  res.status(201).json({
-    success: true,
-    message: 'Event created successfully',
-    data: event
-  });
+        const origNum = typeof originalUnix === 'number' && Number.isFinite(originalUnix)
+          ? originalUnix
+          : Number(originalUnix);
+        if (!Number.isFinite(origNum)) return originalUnix;
+
+        try {
+          // Convert original Unix timestamp to Date in UTC
+          const origDate = new Date(origNum * 1000);
+
+          // Get the local time in the event's timezone
+          const zonedOriginal = toZonedTime(origDate, timezone);
+
+          // Extract time-of-day components (these are the local time components we want to preserve)
+          const hours = zonedOriginal.getHours();
+          const minutes = zonedOriginal.getMinutes();
+          const seconds = zonedOriginal.getSeconds();
+
+          // Get the new date string (YYYY-MM-DD)
+          const baseDateStr = baseDate.toISOString().split('T')[0]!;
+          const dateParts = baseDateStr.split('-');
+
+          // Create a Date object with the new date but same local time-of-day
+          // This is a "naive" local date that we'll interpret as being in the event's timezone
+          const year = parseInt(dateParts[0]!);
+          const month = parseInt(dateParts[1]!) - 1; // JavaScript months are 0-indexed
+          const day = parseInt(dateParts[2]!);
+
+          const newLocalDate = new Date(year, month, day, hours, minutes, seconds);
+
+          // Convert from the event's timezone to UTC
+          // This automatically handles DST - if the new date is in a different DST period,
+          // the UTC offset will be adjusted accordingly
+          const newUtcDate = fromZonedTime(newLocalDate, timezone);
+
+          return Math.floor(newUtcDate.getTime() / 1000);
+        } catch (error) {
+          console.error('DST conversion error:', error);
+          // Fallback to UTC-based calculation
+          const origDate = new Date(origNum * 1000);
+          const hours = origDate.getUTCHours();
+          const minutes = origDate.getUTCMinutes();
+          const secs = origDate.getUTCSeconds();
+
+          const newDate = new Date(baseDate);
+          newDate.setUTCHours(hours, minutes, secs, 0);
+          return Math.floor(newDate.getTime() / 1000);
+        }
+      };
+
+      // Generate all weekly occurrences
+      let currentDate = new Date(startDate);
+      const timezone = eventData.timezone || 'Europe/Helsinki';
+
+      while (currentDate <= endDate) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        occurrences.push({
+          ...eventData,
+          eventDate: dateStr,
+          teamId,
+          repeats: null, // Individual occurrences don't repeat
+          repeatsOn: null,
+          repeatsUntilUnixSec: null,
+          startTimeUnixSec: recomputeUnix(currentDate, eventData.startTimeUnixSec, timezone),
+          endTimeUnixSec: recomputeUnix(currentDate, eventData.endTimeUnixSec, timezone),
+        });
+        currentDate.setUTCDate(currentDate.getUTCDate() + 7); // Weekly: add 7 days
+      }
+
+      occurrencesCount = occurrences.length;
+
+      // Create first occurrence to get its ID
+      const firstOccurrence = occurrences[0];
+      const firstResult = await createEvent(firstOccurrence, req.user?.sub!, trx);
+      const baseEventId = firstResult.insertId;
+
+      // Update first occurrence to have baseEventId set to its own ID
+      await trx.query(
+        `UPDATE events SET baseEventId = ? WHERE id = ?`,
+        [baseEventId, baseEventId]
+      );
+
+      // Create remaining occurrences with baseEventId set to first occurrence's ID
+      const createdEvents = [{ id: baseEventId, ...firstOccurrence }];
+      for (let i = 1; i < occurrences.length; i++) {
+        const occurrence = occurrences[i];
+        // Ensure eventDate is correctly set for this occurrence
+        const occurrenceWithBase = {
+          ...occurrence,
+          baseEventId,
+          eventDate: occurrence.eventDate // Explicitly ensure eventDate is set
+        };
+        const result = await createEvent(occurrenceWithBase, req.user?.sub!, trx);
+        createdEvents.push({ id: result.insertId, ...occurrence });
+      }
+
+      return createdEvents[0];
+    });
+
+    const [ event ] = await getEventById(firstEvent.id.toString());
+
+    res.status(201).json({
+      success: true,
+      message: `Event created successfully with ${occurrencesCount} occurrences`,
+      data: event
+    });
+  } else {
+    // Non-repeating event - create as before
+    const eventCreateData = await createEvent({...req.body, teamId}, req.user?.sub!);
+
+    const id = eventCreateData.insertId;
+    const [ event ] = await getEventById(id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Event created successfully',
+      data: event
+    });
+  }
 })
 
-/**
- * Edit an event (supports recurring events with editMode)
- * Query params:
- * - editMode: 'this' | 'all' (for recurring events)
- * - recurrenceDate: date string (YYYY-MM-DD) - required for editMode='this'
- */
 router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:update', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string; teamId: string };
   const { editMode, recurrenceDate } = req.query as { editMode?: 'this' | 'all'; recurrenceDate?: string };
@@ -49,140 +163,227 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
     throw new AppError('Event not found', 404, 'event_not_found');
   }
 
-  // Edit entire series: use UPDATE to avoid duplicates and preserve id
-  if (event.repeats && editMode === 'all') {
-    await withTransaction(async (trx) => {
-      const merged: any = { ...event, ...updates };
-      const toNull = (v: any) => (v === undefined ? null : v);
-      return await trx.query(`
-        UPDATE events SET
-          title = ?,
-          notes = ?,
-          type = ?,
-          ownNotes = ?,
-          coachesNotes = ?,
-          eventDate = ?,
-          startTimeUnixSec = ?,
-          endTimeUnixSec = ?,
-          locationId = ?,
-          timezone = ?,
-          repeats = ?,
-          repeatsOn = ?,
-          repeatsUntilUnixSec = ?,
-          status = ?,
-          durationInMinutes = ?
-        WHERE id = ? AND teamId = ?
-      `, [
-        merged.title,
-        toNull(merged.notes),
-        merged.type,
-        toNull(merged.ownNotes),
-        toNull(merged.coachesNotes),
-        merged.eventDate,
-        toNull(merged.startTimeUnixSec),
-        toNull(merged.endTimeUnixSec),
-        toNull(merged.locationId),
-        merged.timezone || 'Europe/Helsinki',
-        toNull(merged.repeats),
-        toNull(merged.repeatsOn),
-        toNull(merged.repeatsUntilUnixSec),
-        toNull(merged.status) || 'published',
-        toNull(merged.durationInMinutes),
-        eventId,
-        teamId
-      ]);
-    });
-    const [updatedEvent] = await getEventById(eventId);
+  const merged: any = { ...event, ...updates };
+  const toNull = (v: any) => (v === undefined ? null : v);
 
-    if (!updatedEvent) {
-      throw new AppError('Event not found', 404, 'something_went_wrong');
-    }
+  // Build common update values
+  const updateFields = `
+    title = ?,
+    notes = ?,
+    type = ?,
+    ownNotes = ?,
+    coachesNotes = ?,
+    startTimeUnixSec = ?,
+    endTimeUnixSec = ?,
+    locationId = ?,
+    timezone = ?,
+    status = ?,
+    durationInMinutes = ?,
+    planId = ?,
+    forAllAthletes = ?`;
 
-    return res.status(200).json({
-      success: true,
-      message: 'Event updated successfully',
-      data: updatedEvent
-    });
-  }
+  const commonValues = [
+    merged.title,
+    toNull(merged.notes),
+    merged.type,
+    toNull(merged.ownNotes),
+    toNull(merged.coachesNotes),
+    toNull(merged.startTimeUnixSec),
+    toNull(merged.endTimeUnixSec),
+    toNull(merged.locationId),
+    merged.timezone || 'Europe/Helsinki',
+    toNull(merged.status) || 'published',
+    toNull(merged.durationInMinutes),
+    toNull(merged.planId),
+    merged.forAllAthletes !== undefined ? merged.forAllAthletes : true
+  ];
 
-  // Non-repeating event or unspecified editMode: use DELETE+INSERT strategy
-  if (!event.repeats || !editMode) {
-    await withTransaction(async (trx) => {
+  await withTransaction(async (trx) => {
+    if (event.baseEventId && editMode === 'all') {
+      // Edit entire series: need to recalculate times for each occurrence's date
+      const timezone = merged.timezone || 'Europe/Helsinki';
+
+      // Helper function to recalculate Unix timestamp for a specific date
+      const recomputeUnix = (eventDate: string, originalUnix: number | null | undefined, timezone: string): number | null => {
+        if (!originalUnix) return originalUnix || null;
+
+        const origNum = typeof originalUnix === 'number' && Number.isFinite(originalUnix)
+          ? originalUnix
+          : Number(originalUnix);
+        if (!Number.isFinite(origNum)) return originalUnix;
+
+        try {
+          // Convert original Unix timestamp to Date in UTC
+          const origDate = new Date(origNum * 1000);
+
+          // Get the local time in the event's timezone
+          const zonedOriginal = toZonedTime(origDate, timezone);
+
+          // Extract time-of-day components (these are the local time components we want to preserve)
+          const hours = zonedOriginal.getHours();
+          const minutes = zonedOriginal.getMinutes();
+          const seconds = zonedOriginal.getSeconds();
+
+          // Parse the event date (YYYY-MM-DD)
+          const dateParts = eventDate.split('-');
+          const year = parseInt(dateParts[0]!);
+          const month = parseInt(dateParts[1]!) - 1; // JavaScript months are 0-indexed
+          const day = parseInt(dateParts[2]!);
+
+          // Create a Date object with the event's date but same local time-of-day
+          const newLocalDate = new Date(year, month, day, hours, minutes, seconds);
+
+          // Convert from the event's timezone to UTC (handles DST automatically)
+          const newUtcDate = fromZonedTime(newLocalDate, timezone);
+
+          return Math.floor(newUtcDate.getTime() / 1000);
+        } catch (error) {
+          console.error('DST conversion error:', error);
+          return originalUnix;
+        }
+      };
+
+      // Fetch all events in the series to get their individual eventDates
+      const seriesEvents = await trx.query(`
+        SELECT id, eventDate FROM events
+        WHERE (baseEventId = ? OR id = ?) AND teamId = ?
+      `, [event.baseEventId, event.baseEventId, teamId]) as Array<{ id: number; eventDate: string }>;
+
+      // Update each event with recalculated times for its specific date
+      for (const seriesEvent of seriesEvents) {
+        const recalculatedStartTime = recomputeUnix(seriesEvent.eventDate, merged.startTimeUnixSec, timezone);
+        const recalculatedEndTime = recomputeUnix(seriesEvent.eventDate, merged.endTimeUnixSec, timezone);
+
+        await trx.query(`
+          UPDATE events SET ${updateFields}
+          WHERE id = ? AND teamId = ?
+        `, [
+          merged.title,
+          toNull(merged.notes),
+          merged.type,
+          toNull(merged.ownNotes),
+          toNull(merged.coachesNotes),
+          recalculatedStartTime,
+          recalculatedEndTime,
+          toNull(merged.locationId),
+          timezone,
+          toNull(merged.status) || 'published',
+          toNull(merged.durationInMinutes),
+          toNull(merged.planId),
+          merged.forAllAthletes !== undefined ? merged.forAllAthletes : true,
+          seriesEvent.id,
+          teamId
+        ]);
+      }
+    } else {
+      // Edit single event: either standalone or specific occurrence (can change eventDate)
       await trx.query(`
-        DELETE FROM events WHERE id = ? AND teamId = ?
-      `, [eventId, teamId]);
-
-      return await createEvent({ id: eventId, ...updates, teamId }, req.user?.sub!, trx);
-    });
-    const [updatedEvent] = await getEventById(eventId);
-
-    if (!updatedEvent) {
-      throw new AppError('Event not found', 404, 'something_went_wrong');
+        UPDATE events SET ${updateFields}, eventDate = ?
+        WHERE id = ? AND teamId = ?
+      `, [...commonValues, merged.eventDate, eventId, teamId]);
     }
+  });
 
-    return res.status(200).json({
-      success: true,
-      message: 'Event updated successfully',
-      data: updatedEvent
-    });
+  const [updatedEvent] = await getEventById(eventId);
+  if (!updatedEvent) {
+    throw new AppError('Event not found', 404, 'something_went_wrong');
   }
 
-  if (!recurrenceDate) {
-    throw new AppError('recurrenceDate required for recurring event edits', 400, 'missing_recurrence_date');
+  const message = event.baseEventId && editMode === 'all'
+    ? 'Event series updated successfully'
+    : 'Event updated successfully';
+
+  return res.status(200).json({
+    success: true,
+    message,
+    data: updatedEvent
+  });
+});
+
+router.patch('/:eventId/team/:teamId', requireSignedIn, requireScope('event:update', 'team'), async (req: Request, res: Response) => {
+  const { eventId, teamId } = req.params as { eventId: string; teamId: string };
+  const { editMode } = req.query as { editMode?: 'this' | 'all' };
+  const { planId } = req.body as { planId: number | null };
+
+  const events = await getEventById(eventId);
+  const event = events[0];
+  if (!event || event.teamId !== teamId) {
+    throw new AppError('Event not found', 404, 'event_not_found');
   }
 
-  if (editMode === 'this') {
-    // Edit single occurrence: create replacement event + exception
-    console.log('🔄 Starting editMode=this transaction...');
+  await withTransaction(async (trx) => {
+    if (event.baseEventId && editMode === 'all') {
+      // Update entire series
+      await trx.query(`
+        UPDATE events SET planId = ?
+        WHERE (baseEventId = ? OR id = ?) AND teamId = ?
+      `, [planId, event.baseEventId, event.baseEventId, teamId]);
+    } else {
+      // Update single event
+      await trx.query(`
+        UPDATE events SET planId = ?
+        WHERE id = ? AND teamId = ?
+      `, [planId, eventId, teamId]);
+    }
+  });
 
-    const replacedEvent = await withTransaction(async (trx) => {
-      console.log('📝 Creating replacement event...');
-      // Create replacement event
-      const replacementResult = await createEvent(
-        {
-          ...updates,
-          teamId,
-          eventDate: recurrenceDate,
-          repeats: null, // Single event, not recurring
-          repeatsOn: null,
-          repeatsUntilUnixSec: null,
-        },
-        req.user!.sub,
-        trx
-      );
-      const replacementId = (replacementResult as any)?.insertId ?? (replacementResult as any)?.id ?? replacementResult;
-      console.log('✅ Replacement event created with ID:', replacementId);
-
-      console.log('📝 Creating exception...');
-      // Create exception pointing to replacement
-      await createEventException(
-        event.id,
-        recurrenceDate,
-        false,
-        Number(replacementId),
-        trx
-      );
-
-      const replacementEventResult = await getEventById(replacementId) as Event[];
-      return replacementEventResult[0] || null;
-    });
-
-    return res.status(200).json({ success: true, message: 'Occurrence updated', data: replacedEvent });
+  const [updatedEvent] = await getEventById(eventId);
+  if (!updatedEvent) {
+    throw new AppError('Event not found', 404, 'something_went_wrong');
   }
 
-  throw new AppError('Invalid editMode', 400, 'invalid_edit_mode');
+  const message = event.baseEventId && editMode === 'all'
+    ? 'Event series plan updated successfully'
+    : 'Event plan updated successfully';
+
+  return res.status(200).json({
+    success: true,
+    message,
+    data: updatedEvent
+  });
 });
 
 router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { teamId } = req.params as { teamId: string };
   const { startDate, endDate, date, withPlans } = req.query as { startDate: string, endDate: string, date: string, withPlans: 'true' | 'false' };
 
-  const events = await fetchTeamEvents(teamId, date, startDate, endDate);
-
-  if(!events) {
-    throw new AppError('Events not found', 404, 'something_went_wrong');
+  // Build where clause based on date parameters
+  const where: any = { teamId };
+  if (date) {
+    // Single date - normalize to YYYY-MM-DD format
+    const dateStr = date.split('T')[0];
+    where.eventDate = dateStr;
+  } else if (startDate && endDate) {
+    // Date range
+    const startStr = startDate.split('T')[0];
+    const endStr = endDate.split('T')[0];
+    where.eventDate = {
+      [Op.between]: [startStr, endStr]
+    };
   }
 
+  const eventRows = await models.events.findAll({
+    where,
+    order: [['eventDate', 'ASC'], ['startTimeUnixSec', 'ASC']],
+    include: [
+      {
+        model: models.locations,
+        as: 'location'
+      },
+      {
+        model: models.userEventAttendances,
+        as: 'userEventAttendances',
+        required: false,
+        include: [
+          { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
+        ]
+      }
+    ]
+  });
+
+  const events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+
+  // Filter notes based on permissions
   for(const event of events) {
     if(event.createdById !== req.user?.sub) {
       (event as any).ownNotes = undefined;
@@ -192,6 +393,7 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
     }
   }
 
+  // Add plans if requested
   if(withPlans === 'true') {
     for (const event of events) {
       (event as any).plan = await getPlanByEventId(event.id, teamId);
@@ -205,97 +407,37 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
   });
 });
 
-/**
- * Get a specific event (or specific occurrence of a recurring event)
- * Query params:
- * - recurrenceDate: date string (YYYY-MM-DD) - if provided, gets the specific occurrence
- */
 router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { eventId, teamId } = req.params as { eventId: string, teamId: string };
-  const { recurrenceDate } = req.query as { recurrenceDate?: string };
 
-  const [ event ] = await query(`
-    SELECT events.*, users.email as createdByEmail, users.fullName as createdByName, user_event_attendances.attends FROM events
-    LEFT JOIN users ON events.createdById = users.id
-    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.repeatId = ? AND user_event_attendances.userId = ?)
-    WHERE events.id = ? AND events.teamId = ?
-  `, [recurrenceDate, req.user!.sub, eventId, teamId]) as PublicEvent[];
+  const eventModel = await models.events.findOne({
+    where: {
+      id: eventId,
+      teamId: teamId
+    },
+    include: [
+      {
+        model: models.locations,
+        as: 'location'
+      },
+      {
+        model: models.userEventAttendances,
+        as: 'userEventAttendances',
+        required: false,
+        include: [
+          { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
+        ]
+      }
+    ]
+  });
 
-  // const [ event ] = await query(`
-  //   SELECT events.*, users.email as createdByEmail, users.fullName as createdByName FROM events
-  //   LEFT JOIN users ON events.createdById = users.id
-  //   WHERE events.id = ? AND events.teamId = ?
-  // `, [eventId, teamId]) as PublicEvent[];
-
-  if(!event) {
+  if(!eventModel) {
     throw new AppError('Event not found', 404, 'event_not_found');
   }
 
-  // If requesting a specific occurrence, check for exceptions
-  if (recurrenceDate && event.repeats) {
-    const exception = await getEventException(
-      event.id,
-      recurrenceDate
-    );
+  const event = eventModel.get({ plain: true });
 
-    if (exception) {
-      if (exception.isCancelled) {
-        throw new AppError('This occurrence has been cancelled', 404, 'occurrence_cancelled');
-      }
-      if (exception.replacementEventId) {
-        // Return the replacement event instead
-        const [replacementEvent] = await getEventById(exception.replacementEventId.toString());
-        if (!replacementEvent) {
-          throw new AppError('Replacement event not found', 404, 'replacement_not_found');
-        }
-
-        const [ location ] = await query(`
-          SELECT * FROM locations WHERE id = ?
-        `, [replacementEvent.locationId]) as Location[];
-
-        (replacementEvent as any).location = location || null;
-
-        if(replacementEvent.createdById !== req.user?.sub) {
-          (replacementEvent as any).ownNotes = undefined;
-        }
-
-        if(!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
-          (replacementEvent as any).coachesNotes = undefined;
-        }
-
-        (replacementEvent as any).repeatId = recurrenceDate;
-        (replacementEvent as any).exception = true;
-
-        return res.status(200).json({
-          success: true,
-          message: 'Event fetched successfully',
-          data: replacementEvent
-        });
-      }
-    }
-
-    // No exception, return the base event with the specific occurrence date
-    (event as any).eventDate = recurrenceDate;
-    (event as any).repeatId = recurrenceDate;
-  }
-
-  // If no recurrenceDate was provided and this event is a replacement event,
-  // attach the repeatId based on the exception row that points to this replacement
-  if (!recurrenceDate) {
-    const excRows = await query(`
-      SELECT recurrenceDate FROM event_exceptions WHERE replacementEventId = ? LIMIT 1
-    `, [event.id]) as { recurrenceDate: string }[];
-    if (excRows && excRows[0]) {
-      (event as any).repeatId = excRows[0].recurrenceDate;
-    }
-  }
-
-  const [ location ] = await query(`
-    SELECT * FROM locations WHERE id = ?
-  `, [event.locationId]) as Location[];
-
-  event.location = location || null;
-
+  // Filter notes based on permissions
   if(event.createdById !== req.user?.sub) {
     delete event.ownNotes;
   }
@@ -311,14 +453,9 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
   });
 });
 
-/**
- * Delete/cancel a recurring event occurrence
- * Query params:
- * - recurrenceDate: date string (YYYY-MM-DD) - if provided, cancels just that occurrence
- */
 router.delete('/:eventId/team/:teamId', requireSignedIn, requireScope('event:delete', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string; teamId: string };
-  const { recurrenceDate } = req.query as { recurrenceDate?: string };
+  const { deleteAll } = req.query as { deleteAll?: 'true' | 'false' };
 
   const events = await getEventById(eventId);
   const event = events[0];
@@ -326,33 +463,22 @@ router.delete('/:eventId/team/:teamId', requireSignedIn, requireScope('event:del
     throw new AppError('Event not found', 404, 'event_not_found');
   }
 
-  if (recurrenceDate) {
-    // Cancel single occurrence (only valid for recurring events)
-    if (!event.repeats) {
-      throw new AppError('Cannot cancel occurrence of non-recurring event', 400, 'not_recurring_event');
-    }
-
-    await createEventException(
-      event.id,
-      recurrenceDate,
-      true, // isCancelled
-      null
-    );
-    return res.json({ success: true, message: 'Occurrence cancelled' });
+  // Delete entire series or single event
+  if (event.baseEventId && deleteAll === 'true') {
+    // Delete all events in the series
+    const baseId = event.baseEventId;
+    await query(`DELETE FROM events WHERE baseEventId = ? OR id = ?`, [baseId, baseId]);
+    return res.json({ success: true, message: 'Event series deleted' });
+  } else {
+    // Delete single event only
+    await query(`DELETE FROM events WHERE id = ?`, [eventId]);
+    return res.json({ success: true, message: 'Event deleted' });
   }
-
-  // Delete entire event/series
-  await query(`DELETE FROM events WHERE id = ?`, [eventId]);
-  return res.json({ success: true, message: 'Event deleted' });
 });
 
-router.post('/:eventId/attendance', requireSignedIn, requireScope('event:attendance:create', 'individual'), async (req: Request, res: Response) => {
-  const { eventId } = req.params as { eventId: string; teamId: string };
-  const { attendance, repeatId } = req.body as { attendance: boolean; repeatId?: string };
-
-  if(attendance === undefined) {
-    throw new AppError('Attendance is required', 400, 'attendance_required');
-  }
+router.post('/:eventId/user/:userId/attendance', requireSignedIn, requireScope('event:attendance:create', 'individual'), async (req: Request, res: Response) => {
+  const { eventId, userId } = req.params as { eventId: string; userId: string; };
+  const { attendance, repeatId } = req.body as { attendance?: boolean; repeatId?: string };
 
   // Verify the event exists and user has access to it
   const [event] = await getEventById(eventId);
@@ -365,9 +491,7 @@ router.post('/:eventId/attendance', requireSignedIn, requireScope('event:attenda
     LEFT JOIN team_users ON users.id = team_users.userId
     LEFT JOIN events ON events.teamId = team_users.teamId
     WHERE events.id = ? AND users.id = ?
-  `, [eventId, req.user!.sub]);
-
-  console.log(user);
+  `, [eventId, userId]);
 
   if(!user) {
     throw new AppError('User not found', 404, 'unauthorized');
@@ -376,6 +500,24 @@ router.post('/:eventId/attendance', requireSignedIn, requireScope('event:attenda
   // For recurring events, use the provided repeatId or the event's date
   const attendanceRepeatId = repeatId || event.eventDate;
 
+  if (attendance === undefined) {
+    // Delete attendance record
+    await query(`
+      DELETE FROM user_event_attendances
+      WHERE userId = ? AND eventId = ? AND repeatId = ?
+    `, [userId, eventId, attendanceRepeatId]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Attendance deleted successfully',
+      data: {
+        eventId,
+        repeatId: attendanceRepeatId,
+        attendance: null
+      }
+    });
+  }
+
   // Create or update attendance using raw SQL with ON DUPLICATE KEY UPDATE
   await query(`
     INSERT INTO user_event_attendances (userId, eventId, repeatId, attends)
@@ -383,9 +525,9 @@ router.post('/:eventId/attendance', requireSignedIn, requireScope('event:attenda
     ON DUPLICATE KEY UPDATE
       attends = VALUES(attends),
       updatedAt = CURRENT_TIMESTAMP
-  `, [req.user!.sub, eventId, attendanceRepeatId, attendance]);
+  `, [userId, eventId, attendanceRepeatId, attendance]);
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: 'Attendance updated successfully',
     data: {

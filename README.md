@@ -15,6 +15,27 @@ docker compose -f docker-compose.dev.yml up --build
 - **CORS** - Cross-origin resource sharing support
 - **Environment Variables** - Dotenv configuration
 
+## Autocreate models when dev docker running
+```
+npx sequelize-auto \
+  -h localhost \
+  -d valkku \
+  -u root \
+  -x root \
+  -p 3306 \
+  --dialect mysql \
+  -o ./src/models \
+  --lang ts \
+  --noAlias \
+  --noInit \
+  --indentation 2 \
+  --camelCase \
+  --caseFile c \
+  --caseModel c \
+  --caseProp c \
+  -a ./config/sequelize-auto-config.json
+```
+
 ## 📋 Prerequisites
 
 - Node.js 22.x or higher

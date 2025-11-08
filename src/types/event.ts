@@ -31,6 +31,9 @@ export interface Event {
   repeatsUntilUnixSec: string | null; // format: YYYY-MM-DD (mysql DATE) - repeats until the end of this date so this day is included in repeat
 
   locationId: number;
+  planId?: number | null;
+  baseEventId?: number | null; // Reference to the first occurrence in a series of repeating events
+  forAllAthletes?: boolean;
 
   createdById: string;
   deleted: boolean;
@@ -83,6 +86,8 @@ export interface Plan {
 
 export interface PlanPart {
   id: string;
+  title?: string | null;
+  description?: string | null;
   planId: number;
   position: number;
   durationInMinutes?: number | null;

@@ -307,14 +307,30 @@ const applyExceptions = async (
   return result;
 };
 
-export const fetchTeamEvents = async (teamId: string, date: string, startDate: string, endDate: string) => {
+export const fetchTeamEvents = async (teamId: string, date: string, startDate: string, endDate: string, userId?: string) => {
   let events: Event[] = [];
 
   try {
+    // Load initialized Sequelize model and fetch all team events once
+    const { models } = await import('@/db/index');
+    const EventsModel = models.events;
+    const rows = await EventsModel.findAll({
+      where: { teamId },
+      order: [['eventDate', 'ASC']],
+      include: [
+        { model: models.locations },
+        ...(userId ? [{
+          model: models.userEventAttendances,
+          as: 'userEventAttendances',
+          where: date ? { repeatId: date } : {},
+          required: false
+        }] : [])
+      ],
+    });
+    const allEvents = rows.map(r => r.get({ plain: true })) as unknown as Event[];
+
     if (date) {
       // Single date - need to handle repeats that land on this date
-      const allEvents = await getTeamEvents(teamId);
-
       // Separate events with repeats from non-repeating events
       const nonRepeatingEvents = allEvents.filter(e => !e.repeats) as Event[];
       const repeatingEvents = allEvents.filter(e => e.repeats) as Event[];
@@ -343,9 +359,6 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
       console.log(`\n✨ Returning ${events.length} total event(s) for ${date}\n`);
     } else if (startDate && endDate) {
       // Date range - need to expand repeats
-      // Get ALL events for the team (including those outside the range that might repeat into it)
-      const allEvents = await getTeamEvents(teamId);
-
       // Separate events with repeats from non-repeating events
       const nonRepeatingEvents = allEvents.filter(e => !e.repeats) as Event[];
       const repeatingEvents = allEvents.filter(e => e.repeats) as Event[];
@@ -368,7 +381,7 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
       events = await applyExceptions(events, startDate, endDate);
     } else {
       // No date filter - get all events (no repeats expansion needed)
-      events = await getTeamEvents(teamId) as Event[];
+      events = allEvents as Event[];
     }
   } catch (error) {
     console.error('❌ Error fetching team events:', error);

@@ -103,6 +103,17 @@ module.exports = {
         "createdById" : null,
         "archived" : 0,
         "position" : 4
+      },
+      {
+        "id" : 12,
+        "titleObject" : "{\"en\": \"Info\", \"fi\": \"Info\"}",
+        "scope" : "global",
+        "userId" : null,
+        "teamId" : null,
+        "color" : "#127AB1",
+        "createdById" : null,
+        "archived" : 0,
+        "position" : 5
       }
     ];
 
