@@ -61,6 +61,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY .sequelizerc ./
 COPY sequelize.config.cjs ./
 COPY migrations ./migrations
+COPY seeders ./seeders
 COPY sql ./sql
 COPY scripts/entrypoint.sh ./scripts/
 COPY scripts/create-db.js ./scripts/
