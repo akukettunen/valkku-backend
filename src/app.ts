@@ -50,6 +50,8 @@ const defaultOriginsByEnv: Record<string, string[]> = {
     'https://valkku.com',
     'https://app.valkku.com',
     'https://www.valkku.com',
+    'https://dev.valkku.ai',
+    'https://dev.valkku.com'
   ]
 };
 
