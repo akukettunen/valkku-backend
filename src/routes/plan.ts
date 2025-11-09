@@ -798,7 +798,7 @@ router.put('/plan-part-type/:id', requireSignedIn, validateBasedOnScope('plan-pa
 });
 
 // OK
-router.delete('/plan-part-type/:id', requireSignedIn, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/plan-part-type/:id', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params as { id: string };
 
   const [ eventPlanPartType ] = await getPlanPartTypeById(id) as PlanPartType[];

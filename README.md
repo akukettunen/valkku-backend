@@ -88,6 +88,38 @@ pnpm start    # Start production server
 - `GET /health` - Health check
 - `GET /api/status` - API status
 
+## 📧 Email Template Previews (Development/Staging Only)
+
+### Admin Dashboard
+View all email templates with preview links in all languages:
+```
+http://localhost:8333/api/dev
+https://valkku-backend-staging.onrender.com/api/dev
+```
+
+### Individual Template Previews
+
+**Welcome Email**
+- EN: `http://localhost:8333/api/dev/email-preview?type=welcome&lang=en&userName=Aku&email=user@example.com`
+- FI: `http://localhost:8333/api/dev/email-preview?type=welcome&lang=fi&userName=Aku&email=user@example.com`
+
+**Team Invitation**
+- EN: `http://localhost:8333/api/dev/email-preview?type=teamInvitation&lang=en&teamName=Warriors&inviterName=Coach&role=athlete&recipientName=Aku&email=user@example.com`
+- FI: `http://localhost:8333/api/dev/email-preview?type=teamInvitation&lang=fi&teamName=Warriors&inviterName=Coach&role=athlete&recipientName=Aku&email=user@example.com`
+
+**Password Reset**
+- EN: `http://localhost:8333/api/dev/email-preview?type=passwordReset&lang=en&userName=Aku&email=user@example.com`
+- FI: `http://localhost:8333/api/dev/email-preview?type=passwordReset&lang=fi&userName=Aku&email=user@example.com`
+
+**Team Added**
+- EN: `http://localhost:8333/api/dev/email-preview?type=teamAdded&lang=en&teamName=Warriors&role=athlete&recipientName=Aku&email=user@example.com`
+- FI: `http://localhost:8333/api/dev/email-preview?type=teamAdded&lang=fi&teamName=Warriors&role=athlete&recipientName=Aku&email=user@example.com`
+
+**Text Versions** (append `&format=text` to any URL above)
+- Example: `http://localhost:8333/api/dev/email-preview?type=welcome&lang=en&format=text&userName=Aku&email=user@example.com`
+
+> **Note:** Email preview endpoints are only available in development and staging environments, not in production.
+
 ## 📁 Project Structure
 
 ```

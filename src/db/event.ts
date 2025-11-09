@@ -139,14 +139,14 @@ export const updatePlanPartType = async (id: string, titleObject: LocalizationOb
     WHERE id = ? AND scope = ?
     AND (teamId = ? OR (? IS NULL AND teamId IS NULL))
     AND (userId = ? OR (? IS NULL AND userId IS NULL))
-  `, [titleObject, color, archived, id, scope, teamId, teamId, userId, userId]);
+  `, [JSON.stringify(titleObject), color, archived, id, scope, teamId, teamId, userId, userId]);
   return result;
 };
 
 export const createPlanPartType = async (titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, createdById: string, position: number, teamId: string | null, userId: string | null) => {
   const result = await query(`
     INSERT INTO plan_part_types (titleObject, color, scope, createdById, position, teamId, userId) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [titleObject, color, scope, createdById, position, teamId, userId]);
+  `, [JSON.stringify(titleObject), color, scope, createdById, position, teamId, userId]);
   return result;
 };
 
