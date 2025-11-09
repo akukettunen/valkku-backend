@@ -40,7 +40,8 @@ const defaultOriginsByEnv: Record<string, string[]> = {
     'http://localhost:3000',
   ],
   staging: [
-    'https://dev.valkku.ai'
+    'https://dev.valkku.ai',
+    'https://dev.valkku.com'
   ],
   production: [
     'https://valkku.ai',
