@@ -88,7 +88,7 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     calendarName = tCal('defaultCalendarName', locale),
     calendarDesc = tCal('defaultCalendarDesc', locale),
     prodId = "-//YourOrg//Team Calendar//EN",
-    domain = "https://valkku.com",
+    domain = process.env['FRONTEND_URL'] || 'https://app.valkku.com',
     baseEventUrl,
     defaultDurationMinutes = 60,
     includeDefaultAlarm = false,
