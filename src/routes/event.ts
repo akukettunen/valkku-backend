@@ -154,7 +154,7 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
 
 router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:update', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string; teamId: string };
-  const { editMode, recurrenceDate } = req.query as { editMode?: 'this' | 'all'; recurrenceDate?: string };
+  const { editMode, recurrenceDate } = req.query as { editMode?: 'this' | 'all' | 'thisAndAfter'; recurrenceDate?: string };
   const updates = req.body;
 
   const events = await getEventById(eventId);
@@ -173,6 +173,7 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
     type = ?,
     ownNotes = ?,
     coachesNotes = ?,
+    eventDate = ?,
     startTimeUnixSec = ?,
     endTimeUnixSec = ?,
     locationId = ?,
@@ -188,6 +189,7 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
     merged.type,
     toNull(merged.ownNotes),
     toNull(merged.coachesNotes),
+    merged.eventDate,
     toNull(merged.startTimeUnixSec),
     toNull(merged.endTimeUnixSec),
     toNull(merged.locationId),
@@ -199,9 +201,45 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
   ];
 
   await withTransaction(async (trx) => {
-    if (event.baseEventId && editMode === 'all') {
-      // Edit entire series: need to recalculate times for each occurrence's date
+    if (event.baseEventId && (editMode === 'all' || editMode === 'thisAndAfter')) {
+      // Edit entire series or this and future events: need to recalculate times for each occurrence's date
       const timezone = merged.timezone || 'Europe/Helsinki';
+
+      // Check if eventDate was explicitly provided in the request and actually changed
+      const eventDateProvidedInRequest = 'eventDate' in updates;
+      const eventDateChanged = eventDateProvidedInRequest && merged.eventDate !== event.eventDate;
+
+      const baseEvent = await trx.query(`
+        SELECT repeats, repeatsOn FROM events WHERE id = ?
+      `, [event.baseEventId]) as any[];
+      const isWeeklyRepeating = baseEvent[0]?.repeats === 'weekly';
+
+      // Calculate day-of-week shift if eventDate was explicitly changed
+      let dayShift = 0;
+      let newRepeatsOn: string | null = null;
+      let newWeekday: number | null = null;
+
+      if (eventDateChanged) {
+        const oldDate = new Date(event.eventDate + 'T00:00:00.000Z');
+        const newDate = new Date(merged.eventDate + 'T00:00:00.000Z');
+        const oldDay = oldDate.getUTCDay();
+        const newDay = newDate.getUTCDay();
+        dayShift = newDay - oldDay;
+        newWeekday = newDay;
+
+        // For weekly repeating events, update repeatsOn if day of week changed
+        if (isWeeklyRepeating && dayShift !== 0 && baseEvent[0]?.repeatsOn) {
+          const oldDays = baseEvent[0].repeatsOn.split(',').map((d: string) => parseInt(d));
+          const newDays = oldDays.map((day: number) => {
+            let shifted = day + dayShift;
+            // Handle wrap-around: 0 = Sunday, 6 = Saturday
+            if (shifted < 0) shifted += 7;
+            if (shifted > 6) shifted -= 7;
+            return shifted;
+          }).sort((a: number, b: number) => a - b);
+          newRepeatsOn = newDays.join(',');
+        }
+      }
 
       // Helper function to recalculate Unix timestamp for a specific date
       const recomputeUnix = (eventDate: string, originalUnix: number | null | undefined, timezone: string): number | null => {
@@ -243,26 +281,51 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
         }
       };
 
-      // Fetch all events in the series to get their individual eventDates
-      const seriesEvents = await trx.query(`
-        SELECT id, eventDate FROM events
-        WHERE (baseEventId = ? OR id = ?) AND teamId = ?
-      `, [event.baseEventId, event.baseEventId, teamId]) as Array<{ id: number; eventDate: string }>;
+      // Fetch events in the series to get their individual eventDates
+      let seriesEvents: Array<{ id: number; eventDate: string }>;
+
+      if (editMode === 'thisAndAfter') {
+        // Only get this event and future events
+        seriesEvents = await trx.query(`
+          SELECT id, eventDate FROM events
+          WHERE (baseEventId = ? OR id = ?) AND teamId = ? AND eventDate >= ?
+          ORDER BY eventDate ASC
+        `, [event.baseEventId, event.baseEventId, teamId, event.eventDate]) as Array<{ id: number; eventDate: string }>;
+      } else {
+        // Get all events in the series
+        seriesEvents = await trx.query(`
+          SELECT id, eventDate FROM events
+          WHERE (baseEventId = ? OR id = ?) AND teamId = ?
+          ORDER BY eventDate ASC
+        `, [event.baseEventId, event.baseEventId, teamId]) as Array<{ id: number; eventDate: string }>;
+      }
 
       // Update each event with recalculated times for its specific date
       for (const seriesEvent of seriesEvents) {
-        const recalculatedStartTime = recomputeUnix(seriesEvent.eventDate, merged.startTimeUnixSec, timezone);
-        const recalculatedEndTime = recomputeUnix(seriesEvent.eventDate, merged.endTimeUnixSec, timezone);
+        // Determine the eventDate to use for this event
+        let updatedEventDate = seriesEvent.eventDate;
 
-        await trx.query(`
-          UPDATE events SET ${updateFields}
-          WHERE id = ? AND teamId = ?
-        `, [
+        // If eventDate changed and we're editing all events, shift each event's date
+        if (eventDateChanged && newWeekday !== null) {
+          // Move this event to the same new weekday in its week
+          const currentDate = new Date(seriesEvent.eventDate + 'T00:00:00.000Z');
+          const currentWeekday = currentDate.getUTCDay();
+          const daysToShift = newWeekday - currentWeekday;
+          currentDate.setUTCDate(currentDate.getUTCDate() + daysToShift);
+          updatedEventDate = currentDate.toISOString().split('T')[0]!;
+        }
+
+        const recalculatedStartTime = recomputeUnix(updatedEventDate, merged.startTimeUnixSec, timezone);
+        const recalculatedEndTime = recomputeUnix(updatedEventDate, merged.endTimeUnixSec, timezone);
+
+        // Build the values array
+        const updateValues = [
           merged.title,
           toNull(merged.notes),
           merged.type,
           toNull(merged.ownNotes),
           toNull(merged.coachesNotes),
+          updatedEventDate, // Will be shifted date if day changed, or original date otherwise
           recalculatedStartTime,
           recalculatedEndTime,
           toNull(merged.locationId),
@@ -273,14 +336,26 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
           merged.forAllAthletes !== undefined ? merged.forAllAthletes : true,
           seriesEvent.id,
           teamId
-        ]);
+        ];
+
+        await trx.query(`
+          UPDATE events SET ${updateFields}
+          WHERE id = ? AND teamId = ?
+        `, updateValues);
+
+        // Update repeatsOn for the base event if needed
+        if (seriesEvent.id === event.baseEventId && newRepeatsOn) {
+          await trx.query(`
+            UPDATE events SET repeatsOn = ? WHERE id = ?
+          `, [newRepeatsOn, event.baseEventId]);
+        }
       }
     } else {
       // Edit single event: either standalone or specific occurrence (can change eventDate)
       await trx.query(`
-        UPDATE events SET ${updateFields}, eventDate = ?
+        UPDATE events SET ${updateFields}
         WHERE id = ? AND teamId = ?
-      `, [...commonValues, merged.eventDate, eventId, teamId]);
+      `, [...commonValues, eventId, teamId]);
     }
   });
 
@@ -291,6 +366,8 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
   const message = event.baseEventId && editMode === 'all'
     ? 'Event series updated successfully'
+    : event.baseEventId && editMode === 'thisAndAfter'
+    ? 'This event and future events updated successfully'
     : 'Event updated successfully';
 
   return res.status(200).json({
@@ -302,7 +379,7 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
 
 router.patch('/:eventId/team/:teamId', requireSignedIn, requireScope('event:update', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string; teamId: string };
-  const { editMode } = req.query as { editMode?: 'this' | 'all' };
+  const { editMode } = req.query as { editMode?: 'this' | 'all' | 'thisAndAfter' };
   const { planId } = req.body as { planId: number | null };
 
   const events = await getEventById(eventId);
@@ -318,6 +395,12 @@ router.patch('/:eventId/team/:teamId', requireSignedIn, requireScope('event:upda
         UPDATE events SET planId = ?
         WHERE (baseEventId = ? OR id = ?) AND teamId = ?
       `, [planId, event.baseEventId, event.baseEventId, teamId]);
+    } else if (event.baseEventId && editMode === 'thisAndAfter') {
+      // Update this event and future events
+      await trx.query(`
+        UPDATE events SET planId = ?
+        WHERE (baseEventId = ? OR id = ?) AND teamId = ? AND eventDate >= ?
+      `, [planId, event.baseEventId, event.baseEventId, teamId, event.eventDate]);
     } else {
       // Update single event
       await trx.query(`
@@ -334,6 +417,8 @@ router.patch('/:eventId/team/:teamId', requireSignedIn, requireScope('event:upda
 
   const message = event.baseEventId && editMode === 'all'
     ? 'Event series plan updated successfully'
+    : event.baseEventId && editMode === 'thisAndAfter'
+    ? 'This event and future events plan updated successfully'
     : 'Event plan updated successfully';
 
   return res.status(200).json({
