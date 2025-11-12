@@ -105,6 +105,29 @@ export const getTeamEvents = async (teamId: string, userId?: string) => {
   return result as (Event & { attends: boolean })[];
 };
 
+export const getTeamEventsWithAttendanceCount = async (teamId: string, userId?: string) => {
+  const result = await query(`
+    SELECT
+      events.*,
+      locations.*,
+      events.id as id,
+      locations.id as locationId,
+      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+      user_event_attendances.attends,
+      (
+        SELECT COUNT(*)
+        FROM user_event_attendances uea
+        WHERE uea.eventId = events.id AND uea.attends = 1
+      ) as attendeeCount
+    FROM events
+    LEFT JOIN locations ON events.locationId = locations.id
+    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
+    WHERE events.teamId = ?
+    ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
+  `, [userId, teamId]);
+  return result as (Event & { attends: boolean; attendeeCount: number })[];
+};
+
 export const getPlanPartTypeById = async (id: string) => {
   const result = await query(`
     SELECT * FROM plan_part_types WHERE id = ?

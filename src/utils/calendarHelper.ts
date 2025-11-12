@@ -30,6 +30,10 @@ export interface EventInput {
 
   forAllAthletes?: number | boolean | null;
 
+  // Attendance fields
+  attends?: number | boolean | null;
+  attendeeCount?: number | null;
+
   // Rich location fields
   name?: string | null;
   formattedAddress?: string | null;
@@ -71,6 +75,7 @@ export interface IcsOptions {
    * If you always want local dates for Helsinki, set 180 (summer) or compute dynamically.
    */
   allDayLocalOffsetMinutes?: number;
+  guardedFirstName?: string | null;
 }
 
 /**
@@ -93,6 +98,7 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     defaultDurationMinutes = 60,
     includeDefaultAlarm = false,
     allDayLocalOffsetMinutes = 0,
+    guardedFirstName = null,
   } = options;
 
   const events: EventInput[] = Array.isArray(input)
@@ -217,7 +223,38 @@ export function eventsToICS(input: EventInput[] | EventsPayload | null | undefin
     if (coachesNotes && ev.coachesNotes) lines.push(`${tCal('coaches', locale)}: ${ev.coachesNotes}`);
     if (ownNotes && ev.ownNotes) lines.push(`${tCal('own', locale)}: ${ev.ownNotes}`);
     lines.push(`${tCal('type', locale)}: ${localizedType(ev.type || undefined)}`);
-    if (baseEventUrl) lines.push(`${tCal('link', locale)}: ${baseEventUrl.replace(/\/+$/, "")}/${ev.id ?? ""}`);
+
+    // Add attendance information
+    if (ev.attendeeCount != null && ev.attendeeCount > 0) {
+      const attendeeText = locale === 'fi' ? 'Osallistujia' : 'Attendees';
+      lines.push(`${attendeeText}: ${ev.attendeeCount}`);
+    }
+
+    // Add current user's RSVP status
+    if (ev.attends != null) {
+      const attending = ev.attends === 1 || ev.attends === true;
+      if (guardedFirstName) {
+        // Viewing as guardian - show guarded person's attendance
+        if (attending) {
+          const rsvpText = locale === 'fi' ? `${guardedFirstName} osallistuu` : `${guardedFirstName} will attend`;
+          lines.push(`✓ ${rsvpText}`);
+        } else {
+          const notAttendingText = locale === 'fi' ? `${guardedFirstName} ei osallistu` : `${guardedFirstName} won't attend`;
+          lines.push(`✗ ${notAttendingText}`);
+        }
+      } else {
+        // Viewing as self
+        if (attending) {
+          const rsvpText = locale === 'fi' ? 'Olet ilmoittautunut' : 'You are attending';
+          lines.push(`✓ ${rsvpText}`);
+        } else {
+          const notAttendingText = locale === 'fi' ? 'Et osallistu' : 'You are not attending';
+          lines.push(`✗ ${notAttendingText}`);
+        }
+      }
+    }
+
+    // Link is added via URL field below, not in description
     return esc(lines.join("\n"));
   };
 

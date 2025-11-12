@@ -1,14 +1,15 @@
 import { AppError } from '@/middleware/errors';
 import { Router, Request, Response } from 'express';
-import { query } from '@/db/index';
+import { query, sequelize } from '@/db/index';
 import { getPublicUserSelfById } from '@/utils/userHelper';
 import { ROLES } from '@/types/team';
 import { requireSignedIn } from '@/middleware/auth';
 import z from 'zod';
 import { validate } from '@/middleware/validation';
 import { createId } from '@/utils/userHelper';
-import { getTeamEvents } from '@/db/event';
+import { getTeamEventsWithAttendanceCount } from '@/db/event';
 import { EventInput, eventsToICS } from '@/utils/calendarHelper';
+import { QueryTypes } from 'sequelize';
 
 const router: Router = Router();
 
@@ -72,12 +73,23 @@ router.get("/:token", async (req: Request, res: Response) => {
 
   // 2. Verify user
   const user = await getPublicUserSelfById(sub.userId, null);
+  let guardedData;
+  if(sub.guardianOfId) {
+    guardedData = await sequelize.query(
+      `SELECT * FROM users WHERE id = ?`,
+      {
+        replacements: [sub.guardianOfId],
+        type: QueryTypes.SELECT
+      }
+    ) as any[];
+  }
+
   if (!user) {
     throw new AppError("User not found for subscription", 404, "user_not_found");
   }
 
   // 3. Fetch team events
-  const events = (await getTeamEvents(sub.teamId)) as unknown as EventInput[];
+  const events = (await getTeamEventsWithAttendanceCount(sub.teamId, sub.guardianOfId || sub.userId)) as unknown as EventInput[];
   if (!events) {
     throw new AppError("Team not found", 404, "team_not_found");
   }
@@ -97,8 +109,8 @@ router.get("/:token", async (req: Request, res: Response) => {
   });
 
   // 4. Build ICS feed
-  const host = process.env['APP_URL'] || 'https://valkku.com';
-  const domain = host.split("//")[1]?.split("/")[0] || 'valkku.com';
+  const host = process.env['FRONTEND_URL'] || 'https://app.valkku.com';
+  const domain = host.split("//")[1]?.split("/")[0] || 'app.valkku.com';
 
   const calendarName = `${sub.teamName}`;
   const calendarDesc = `Public schedule for team ${sub.teamId}`;
@@ -110,7 +122,8 @@ router.get("/:token", async (req: Request, res: Response) => {
     baseEventUrl: `https://${domain}/#/events`,
     includeDefaultAlarm: false,
     defaultDurationMinutes: 60,
-    locale: user.preferredLanguage
+    locale: user.preferredLanguage,
+    guardedFirstName: guardedData?.[0]?.firstName
   });
 
   // 5. Always respond with fresh content (no caching)
