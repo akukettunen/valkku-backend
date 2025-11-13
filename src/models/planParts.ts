@@ -1,5 +1,6 @@
 import * as Sequelize from 'sequelize';
 import { DataTypes, Model, Optional } from 'sequelize';
+import type { folders, foldersId } from './folders';
 import type { planPartItems, planPartItemsId } from './planPartItems';
 import type { planPartTypes, planPartTypesId } from './planPartTypes';
 import type { planPlanParts, planPlanPartsId } from './planPlanParts';
@@ -19,11 +20,12 @@ export interface planPartsAttributes {
   scope: 'global' | 'club' | 'team' | 'user';
   updatedAt?: Date;
   showInLibrary: number;
+  folderId?: number;
 }
 
 export type planPartsPk = "id";
 export type planPartsId = planParts[planPartsPk];
-export type planPartsOptionalAttributes = "teamId" | "title" | "description" | "createdById" | "position" | "createdAt" | "scope" | "updatedAt" | "showInLibrary";
+export type planPartsOptionalAttributes = "teamId" | "title" | "description" | "createdById" | "position" | "createdAt" | "scope" | "updatedAt" | "showInLibrary" | "folderId";
 export type planPartsCreationAttributes = Optional<planPartsAttributes, planPartsOptionalAttributes>;
 
 export class planParts extends Model<planPartsAttributes, planPartsCreationAttributes> implements planPartsAttributes {
@@ -39,7 +41,13 @@ export class planParts extends Model<planPartsAttributes, planPartsCreationAttri
   scope!: 'global' | 'club' | 'team' | 'user';
   updatedAt?: Date;
   showInLibrary!: number;
+  folderId?: number;
 
+  // planParts belongsTo folders via folderId
+  folder!: folders;
+  getFolder!: Sequelize.BelongsToGetAssociationMixin<folders>;
+  setFolder!: Sequelize.BelongsToSetAssociationMixin<folders, foldersId>;
+  createFolder!: Sequelize.BelongsToCreateAssociationMixin<folders>;
   // planParts belongsTo planPartTypes via typeId
   type!: planPartTypes;
   getType!: Sequelize.BelongsToGetAssociationMixin<planPartTypes>;
@@ -146,6 +154,14 @@ export class planParts extends Model<planPartsAttributes, planPartsCreationAttri
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: 0
+    },
+    folderId: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+      references: {
+        model: 'folders',
+        key: 'id'
+      }
     }
   }, {
     sequelize,
@@ -179,6 +195,13 @@ export class planParts extends Model<planPartsAttributes, planPartsCreationAttri
         using: "BTREE",
         fields: [
           { name: "teamId" },
+        ]
+      },
+      {
+        name: "fk_plan_part_folder",
+        using: "BTREE",
+        fields: [
+          { name: "folderId" },
         ]
       },
     ]

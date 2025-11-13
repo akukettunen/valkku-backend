@@ -5,10 +5,14 @@ import { calSubscriptions as _calSubscriptions } from "./calSubscriptions";
 import type { calSubscriptionsAttributes, calSubscriptionsCreationAttributes } from "./calSubscriptions";
 import { events as _events } from "./events";
 import type { eventsAttributes, eventsCreationAttributes } from "./events";
+import { folders as _folders } from "./folders";
+import type { foldersAttributes, foldersCreationAttributes } from "./folders";
 import { locations as _locations } from "./locations";
 import type { locationsAttributes, locationsCreationAttributes } from "./locations";
 import { passwordResets as _passwordResets } from "./passwordResets";
 import type { passwordResetsAttributes, passwordResetsCreationAttributes } from "./passwordResets";
+import { periods as _periods } from "./periods";
+import type { periodsAttributes, periodsCreationAttributes } from "./periods";
 import { planPartItemTexts as _planPartItemTexts } from "./planPartItemTexts";
 import type { planPartItemTextsAttributes, planPartItemTextsCreationAttributes } from "./planPartItemTexts";
 import { planPartItems as _planPartItems } from "./planPartItems";
@@ -38,8 +42,10 @@ export {
   _sequelizeMeta as sequelizeMeta,
   _calSubscriptions as calSubscriptions,
   _events as events,
+  _folders as folders,
   _locations as locations,
   _passwordResets as passwordResets,
+  _periods as periods,
   _planPartItemTexts as planPartItemTexts,
   _planPartItems as planPartItems,
   _planPartTypes as planPartTypes,
@@ -61,10 +67,14 @@ export type {
   calSubscriptionsCreationAttributes,
   eventsAttributes,
   eventsCreationAttributes,
+  foldersAttributes,
+  foldersCreationAttributes,
   locationsAttributes,
   locationsCreationAttributes,
   passwordResetsAttributes,
   passwordResetsCreationAttributes,
+  periodsAttributes,
+  periodsCreationAttributes,
   planPartItemTextsAttributes,
   planPartItemTextsCreationAttributes,
   planPartItemsAttributes,
@@ -95,8 +105,10 @@ export function initModels(sequelize: Sequelize) {
   const sequelizeMeta = _sequelizeMeta.initModel(sequelize);
   const calSubscriptions = _calSubscriptions.initModel(sequelize);
   const events = _events.initModel(sequelize);
+  const folders = _folders.initModel(sequelize);
   const locations = _locations.initModel(sequelize);
   const passwordResets = _passwordResets.initModel(sequelize);
+  const periods = _periods.initModel(sequelize);
   const planPartItemTexts = _planPartItemTexts.initModel(sequelize);
   const planPartItems = _planPartItems.initModel(sequelize);
   const planPartTypes = _planPartTypes.initModel(sequelize);
@@ -118,6 +130,12 @@ export function initModels(sequelize: Sequelize) {
   events.hasMany(events, { foreignKey: "baseEventId"});
   userEventAttendances.belongsTo(events, { foreignKey: "eventId"});
   events.hasMany(userEventAttendances, { foreignKey: "eventId"});
+  folders.belongsTo(folders, { foreignKey: "parentId"});
+  folders.hasMany(folders, { foreignKey: "parentId"});
+  planPartTypes.belongsTo(folders, { foreignKey: "folderId"});
+  folders.hasMany(planPartTypes, { foreignKey: "folderId"});
+  planParts.belongsTo(folders, { foreignKey: "folderId"});
+  folders.hasMany(planParts, { foreignKey: "folderId"});
   events.belongsTo(locations, { foreignKey: "locationId"});
   locations.hasMany(events, { foreignKey: "locationId"});
   planPartItemTexts.belongsTo(planPartItems, { foreignKey: "planPartItemId"});
@@ -140,6 +158,8 @@ export function initModels(sequelize: Sequelize) {
   teams.hasMany(events, { foreignKey: "teamId"});
   locations.belongsTo(teams, { foreignKey: "teamId"});
   teams.hasMany(locations, { foreignKey: "teamId"});
+  periods.belongsTo(teams, { foreignKey: "teamId"});
+  teams.hasMany(periods, { foreignKey: "teamId"});
   planPartTypes.belongsTo(teams, { foreignKey: "teamId"});
   teams.hasMany(planPartTypes, { foreignKey: "teamId"});
   planParts.belongsTo(teams, { foreignKey: "teamId"});
@@ -158,6 +178,8 @@ export function initModels(sequelize: Sequelize) {
   users.hasMany(events, { foreignKey: "createdById"});
   passwordResets.belongsTo(users, { foreignKey: "userId"});
   users.hasMany(passwordResets, { foreignKey: "userId"});
+  periods.belongsTo(users, { as: 'createdBy', foreignKey: "createdById"});
+  users.hasMany(periods, { foreignKey: "createdById"});
   planPartTypes.belongsTo(users, { foreignKey: "createdById"});
   users.hasMany(planPartTypes, { foreignKey: "createdById"});
   planPartTypes.belongsTo(users, { foreignKey: "userId"});
@@ -179,8 +201,10 @@ export function initModels(sequelize: Sequelize) {
     sequelizeMeta: sequelizeMeta,
     calSubscriptions: calSubscriptions,
     events: events,
+    folders: folders,
     locations: locations,
     passwordResets: passwordResets,
+    periods: periods,
     planPartItemTexts: planPartItemTexts,
     planPartItems: planPartItems,
     planPartTypes: planPartTypes,

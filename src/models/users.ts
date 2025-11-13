@@ -3,6 +3,7 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import type { calSubscriptions, calSubscriptionsId } from './calSubscriptions';
 import type { events, eventsId } from './events';
 import type { passwordResets, passwordResetsId } from './passwordResets';
+import type { periods, periodsId } from './periods';
 import type { planPartTypes, planPartTypesId } from './planPartTypes';
 import type { planParts, planPartsId } from './planParts';
 import type { plans, plansId } from './plans';
@@ -111,6 +112,18 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
   hasPasswordReset!: Sequelize.HasManyHasAssociationMixin<passwordResets, passwordResetsId>;
   hasPasswordResets!: Sequelize.HasManyHasAssociationsMixin<passwordResets, passwordResetsId>;
   countPasswordResets!: Sequelize.HasManyCountAssociationsMixin;
+  // users hasMany periods via createdById
+  periods!: periods[];
+  getPeriods!: Sequelize.HasManyGetAssociationsMixin<periods>;
+  setPeriods!: Sequelize.HasManySetAssociationsMixin<periods, periodsId>;
+  addPeriod!: Sequelize.HasManyAddAssociationMixin<periods, periodsId>;
+  addPeriods!: Sequelize.HasManyAddAssociationsMixin<periods, periodsId>;
+  createPeriod!: Sequelize.HasManyCreateAssociationMixin<periods>;
+  removePeriod!: Sequelize.HasManyRemoveAssociationMixin<periods, periodsId>;
+  removePeriods!: Sequelize.HasManyRemoveAssociationsMixin<periods, periodsId>;
+  hasPeriod!: Sequelize.HasManyHasAssociationMixin<periods, periodsId>;
+  hasPeriods!: Sequelize.HasManyHasAssociationsMixin<periods, periodsId>;
+  countPeriods!: Sequelize.HasManyCountAssociationsMixin;
   // users hasMany planPartTypes via createdById
   planPartTypes!: planPartTypes[];
   getPlanPartTypes!: Sequelize.HasManyGetAssociationsMixin<planPartTypes>;

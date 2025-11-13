@@ -10,7 +10,7 @@ export interface eventsAttributes {
   id: number;
   title: string;
   teamId: string;
-  type: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event';
+  type: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event' | 'mental';
   status: 'draft' | 'published' | 'archived';
   createdById?: string;
   notes?: string;
@@ -41,7 +41,7 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
   id!: number;
   title!: string;
   teamId!: string;
-  type!: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event';
+  type!: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event' | 'mental';
   status!: 'draft' | 'published' | 'archived';
   createdById?: string;
   notes?: string;
@@ -133,7 +133,7 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
       }
     },
     type: {
-      type: DataTypes.ENUM('practise','match','meeting','self_training','other_event'),
+      type: DataTypes.ENUM('practise','match','meeting','self_training','other_event','mental'),
       allowNull: false
     },
     status: {
