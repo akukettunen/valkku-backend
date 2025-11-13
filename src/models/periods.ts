@@ -39,10 +39,10 @@ export class periods extends Model<periodsAttributes, periodsCreationAttributes>
   setTeam!: Sequelize.BelongsToSetAssociationMixin<teams, teamsId>;
   createTeam!: Sequelize.BelongsToCreateAssociationMixin<teams>;
   // periods belongsTo users via createdById
-  createdBy!: users;
-  getCreatedBy!: Sequelize.BelongsToGetAssociationMixin<users>;
-  setCreatedBy!: Sequelize.BelongsToSetAssociationMixin<users, usersId>;
-  createCreatedBy!: Sequelize.BelongsToCreateAssociationMixin<users>;
+  user!: users;
+  getUser!: Sequelize.BelongsToGetAssociationMixin<users>;
+  setUser!: Sequelize.BelongsToSetAssociationMixin<users, usersId>;
+  createUser!: Sequelize.BelongsToCreateAssociationMixin<users>;
 
   static initModel(sequelize: Sequelize.Sequelize): typeof periods {
     return periods.init({

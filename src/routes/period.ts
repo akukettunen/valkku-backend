@@ -33,9 +33,9 @@ router.get('/:periodId/team/:teamId', requireSignedIn, requireScope('period:read
   const { periodId, teamId } = req.params as { periodId: string; teamId: string };
 
   const period = await models.periods.findOne({
-    where: { 
+    where: {
       id: periodId,
-      teamId 
+      teamId
     },
     include: [
       {
@@ -135,7 +135,7 @@ router.put('/:periodId/team/:teamId', requireSignedIn, validate(updatePeriodSche
         }
       ]
     });
-    
+
     res.json({
       success: true,
       message: 'No changes to update',
