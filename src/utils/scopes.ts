@@ -56,7 +56,12 @@ export default {
     "period:create": ["owner", "admin", "coach"],
     "period:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "period:update": ["owner", "admin", "coach"],
-    "period:delete": ["owner", "admin", "coach"]
+    "period:delete": ["owner", "admin", "coach"],
+
+    "folder:create": ["owner", "admin", "coach"],
+    "folder:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "folder:update": ["owner", "admin", "coach"],
+    "folder:delete": ["owner", "admin", "coach"],
   },
   "individual": { // actions regarding ones own stuff
     "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete

@@ -18,6 +18,7 @@ import teamRoutes from '@/routes/team';
 import locationRoutes from '@/routes/location';
 import planRoutes from '@/routes/plan';
 import periodRoutes from '@/routes/period';
+import folderRoutes from '@/routes/folder';
 import devRoutes from '@/routes/dev';
 import calendarRoutes from '@/routes/calendar';
 
@@ -110,7 +111,11 @@ app.use('/api/user', userRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/location', locationRoutes);
 app.use('/api/plan', planRoutes);
+<<<<<<< HEAD
 app.use('/api/period', periodRoutes);
+=======
+app.use('/api/folder', folderRoutes);
+>>>>>>> library
 app.use('/api/calendar', calendarRoutes);
 if (process.env['NODE_ENV'] !== 'test') {
   // Defer requiring event routes in tests to avoid mock shape mismatches
