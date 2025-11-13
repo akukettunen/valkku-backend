@@ -16,7 +16,6 @@ router.get('/team/:teamId', requireSignedIn, requireScope('period:read', 'team')
     include: [
       {
         model: models.users,
-        as: 'createdBy',
         attributes: ['id', 'firstName', 'lastName']
       }
     ],
@@ -34,14 +33,13 @@ router.get('/:periodId/team/:teamId', requireSignedIn, requireScope('period:read
   const { periodId, teamId } = req.params as { periodId: string; teamId: string };
 
   const period = await models.periods.findOne({
-    where: {
+    where: { 
       id: periodId,
-      teamId
+      teamId 
     },
     include: [
       {
         model: models.users,
-        as: 'createdBy',
         attributes: ['id', 'firstName', 'lastName']
       }
     ]
@@ -79,7 +77,6 @@ router.post('/team/:teamId', requireSignedIn, validate(createPeriodSchema), requ
     include: [
       {
         model: models.users,
-        as: 'createdBy',
         attributes: ['id', 'firstName', 'lastName']
       }
     ]
@@ -134,12 +131,11 @@ router.put('/:periodId/team/:teamId', requireSignedIn, validate(updatePeriodSche
       include: [
         {
           model: models.users,
-          as: 'createdBy',
           attributes: ['id', 'firstName', 'lastName']
         }
       ]
     });
-
+    
     res.json({
       success: true,
       message: 'No changes to update',
@@ -153,7 +149,6 @@ router.put('/:periodId/team/:teamId', requireSignedIn, validate(updatePeriodSche
     include: [
       {
         model: models.users,
-        as: 'createdBy',
         attributes: ['id', 'firstName', 'lastName']
       }
     ]
