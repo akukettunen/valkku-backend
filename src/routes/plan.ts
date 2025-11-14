@@ -436,6 +436,28 @@ router.put('/part/:partId/team/:teamId', requireSignedIn, requireScope('plan-par
   });
 });
 
+// PATCH - Update showInLibrary for a plan part
+router.patch('/part/:partId/team/:teamId/show-in-library', requireSignedIn, requireScope('plan-part:update', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  const { partId, teamId } = req.params as { partId: string, teamId: string };
+  const { showInLibrary } = req.body as { showInLibrary: boolean };
+
+  const part = await models.planParts.findOne({
+    where: { id: partId, teamId } as any
+  });
+
+  if (!part) {
+    throw new AppError('Plan part not found', 404, 'plan_part_not_found');
+  }
+
+  await part.update({ showInLibrary: showInLibrary ? 1 : 0 });
+
+  res.status(200).json({
+    success: true,
+    message: 'Plan part visibility updated successfully',
+    data: { showInLibrary }
+  });
+});
+
 // CHECK
 router.delete('/part/:partId/team/:teamId', requireSignedIn, requireScope('plan-part:delete', 'team'), async (req: Request, res: Response, next: NextFunction) => {
   const { partId, teamId } = req.params as { partId: string, teamId: string };
@@ -486,6 +508,28 @@ router.delete('/team/:teamId/event/:eventId', requireSignedIn, requireScope('pla
   res.status(200).json({
     success: true,
     message: 'Plan deleted successfully'
+  });
+});
+
+// PATCH - Update showInLibrary for a plan
+router.patch('/:planId/team/:teamId/show-in-library', requireSignedIn, requireScope('plan:update', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  const { planId, teamId } = req.params as { planId: string, teamId: string };
+  const { showInLibrary } = req.body as { showInLibrary: boolean };
+
+  const plan = await models.plans.findOne({
+    where: { id: parseInt(planId), teamId }
+  });
+
+  if (!plan) {
+    throw new AppError('Plan not found', 404, 'plan_not_found');
+  }
+
+  await plan.update({ showInLibrary: showInLibrary ? 1 : 0 });
+
+  res.status(200).json({
+    success: true,
+    message: 'Plan visibility updated successfully',
+    data: { showInLibrary }
   });
 });
 
