@@ -71,6 +71,16 @@ router.get("/:token", async (req: Request, res: Response) => {
 
   const sub = subscriptions[0];
 
+  // 1.1 Verify team membership
+  const membership = (await query(
+    `SELECT status FROM team_users WHERE userId = ? AND teamId = ?`,
+    [sub.userId, sub.teamId]
+  )) as Array<{ status: string }>;
+
+  if (!membership?.[0]) {
+    throw new AppError("User is no longer a member of this team", 403, "access_denied");
+  }
+
   // 2. Verify user
   const user = await getPublicUserSelfById(sub.userId, null);
   let guardedData;
@@ -93,20 +103,6 @@ router.get("/:token", async (req: Request, res: Response) => {
   if (!events) {
     throw new AppError("Team not found", 404, "team_not_found");
   }
-
-  // Debug: Log events to see what we're working with
-  console.log(`Found ${events.length} events for team ${sub.teamId}`);
-  events.forEach((ev, i) => {
-    console.log(`Event ${i}:`, {
-      id: ev.id,
-      title: ev.title,
-      eventDate: ev.eventDate,
-      startTimeUnixSec: ev.startTimeUnixSec,
-      endTimeUnixSec: ev.endTimeUnixSec,
-      durationInMinutes: ev.durationInMinutes,
-      type: ev.type
-    });
-  });
 
   // 4. Build ICS feed
   const host = process.env['FRONTEND_URL'] || 'https://app.valkku.com';
