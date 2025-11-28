@@ -6,6 +6,7 @@ export const patchUserSchema = z.object({
   firstName: z.string().min(2, 'First name is required').optional(),
   lastName: z.string().min(2, 'Last name is required').optional(),
   preferredLanguage: preferredLanguageSchema.optional(),
+  notificationToken: z.string().nullable().optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update'
 }).refine(data => {

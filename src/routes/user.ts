@@ -32,17 +32,18 @@ router.get('/me', requireSignedIn, async (req: Request, res: Response) => {
 });
 
 router.patch('/me', requireSignedIn, validate(patchUserSchema), async (req: Request, res: Response) => {
-  const { emojiClickedCount, firstName, lastName, preferredLanguage } = req.body;
+  const { emojiClickedCount, firstName, lastName, preferredLanguage, notificationToken } = req.body;
   const [ user ] = await getUserById(req.user?.sub!) as User[];
   if (!user) {
     throw new AppError('User not found', 404, 'user_not_found');
   }
 
-  const updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; preferredLanguage?: PREFERRED_LANGUAGE } = {
+  const updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; preferredLanguage?: PREFERRED_LANGUAGE; notificationToken?: string | null } = {
     emojiClickedCount,
     firstName,
     lastName,
-    preferredLanguage
+    preferredLanguage,
+    notificationToken
   };
 
   await updateUserDetails(updates, user.id);

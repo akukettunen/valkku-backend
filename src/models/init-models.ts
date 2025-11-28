@@ -3,6 +3,8 @@ import { sequelizeMeta as _sequelizeMeta } from "./sequelizeMeta";
 import type { sequelizeMetaAttributes, sequelizeMetaCreationAttributes } from "./sequelizeMeta";
 import { calSubscriptions as _calSubscriptions } from "./calSubscriptions";
 import type { calSubscriptionsAttributes, calSubscriptionsCreationAttributes } from "./calSubscriptions";
+import { eventUsers as _eventUsers } from "./eventUsers";
+import type { eventUsersAttributes, eventUsersCreationAttributes } from "./eventUsers";
 import { events as _events } from "./events";
 import type { eventsAttributes, eventsCreationAttributes } from "./events";
 import { folders as _folders } from "./folders";
@@ -41,6 +43,7 @@ import type { usersAttributes, usersCreationAttributes } from "./users";
 export {
   _sequelizeMeta as sequelizeMeta,
   _calSubscriptions as calSubscriptions,
+  _eventUsers as eventUsers,
   _events as events,
   _folders as folders,
   _locations as locations,
@@ -65,6 +68,8 @@ export type {
   sequelizeMetaCreationAttributes,
   calSubscriptionsAttributes,
   calSubscriptionsCreationAttributes,
+  eventUsersAttributes,
+  eventUsersCreationAttributes,
   eventsAttributes,
   eventsCreationAttributes,
   foldersAttributes,
@@ -104,6 +109,7 @@ export type {
 export function initModels(sequelize: Sequelize) {
   const sequelizeMeta = _sequelizeMeta.initModel(sequelize);
   const calSubscriptions = _calSubscriptions.initModel(sequelize);
+  const eventUsers = _eventUsers.initModel(sequelize);
   const events = _events.initModel(sequelize);
   const folders = _folders.initModel(sequelize);
   const locations = _locations.initModel(sequelize);
@@ -126,6 +132,8 @@ export function initModels(sequelize: Sequelize) {
   teams.belongsToMany(users, { as: 'userIdUsers', through: teamUsers, foreignKey: "teamId", otherKey: "userId" });
   users.belongsToMany(events, { as: 'eventIdEvents', through: userEventAttendances, foreignKey: "userId", otherKey: "eventId" });
   users.belongsToMany(teams, { as: 'teamIdTeams', through: teamUsers, foreignKey: "userId", otherKey: "teamId" });
+  eventUsers.belongsTo(events, { foreignKey: "eventId"});
+  events.hasMany(eventUsers, { foreignKey: "eventId"});
   events.belongsTo(events, { foreignKey: "baseEventId"});
   events.hasMany(events, { foreignKey: "baseEventId"});
   userEventAttendances.belongsTo(events, { foreignKey: "eventId"});
@@ -174,6 +182,8 @@ export function initModels(sequelize: Sequelize) {
   users.hasMany(calSubscriptions, { foreignKey: "userId"});
   calSubscriptions.belongsTo(users, { foreignKey: "guardianOfId"});
   users.hasMany(calSubscriptions, { foreignKey: "guardianOfId"});
+  eventUsers.belongsTo(users, { foreignKey: "userId"});
+  users.hasMany(eventUsers, { foreignKey: "userId"});
   events.belongsTo(users, { foreignKey: "createdById"});
   users.hasMany(events, { foreignKey: "createdById"});
   passwordResets.belongsTo(users, { foreignKey: "userId"});
@@ -200,6 +210,7 @@ export function initModels(sequelize: Sequelize) {
   return {
     sequelizeMeta: sequelizeMeta,
     calSubscriptions: calSubscriptions,
+    eventUsers: eventUsers,
     events: events,
     folders: folders,
     locations: locations,

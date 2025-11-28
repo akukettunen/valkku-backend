@@ -36,7 +36,7 @@ export const updateUser = async (emojiClickedCount: number, id: string) => {
   return result;
 };
 
-export const updateUserDetails = async (updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; preferredLanguage?: PREFERRED_LANGUAGE }, id: string) => {
+export const updateUserDetails = async (updates: { emojiClickedCount?: number; firstName?: string; lastName?: string; preferredLanguage?: PREFERRED_LANGUAGE; notificationToken?: string | null }, id: string) => {
   const fields = [];
   const values = [];
 
@@ -55,6 +55,10 @@ export const updateUserDetails = async (updates: { emojiClickedCount?: number; f
   if (updates.preferredLanguage !== undefined) {
     fields.push('preferredLanguage = ?');
     values.push(updates.preferredLanguage);
+  }
+  if (updates.notificationToken !== undefined) {
+    fields.push('notificationToken = ?');
+    values.push(updates.notificationToken);
   }
 
   values.push(id);

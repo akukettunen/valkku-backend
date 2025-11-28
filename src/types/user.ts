@@ -22,6 +22,7 @@ export interface User {
   preferredLanguage: PREFERRED_LANGUAGE;
   forcePasswordChange: boolean;
   superAdmin: boolean;
+  notificationToken?: string;
 }
 
 export interface PublicUserSelf {

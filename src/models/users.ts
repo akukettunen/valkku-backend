@@ -1,6 +1,7 @@
 import * as Sequelize from 'sequelize';
 import { DataTypes, Model, Optional } from 'sequelize';
 import type { calSubscriptions, calSubscriptionsId } from './calSubscriptions';
+import type { eventUsers, eventUsersId } from './eventUsers';
 import type { events, eventsId } from './events';
 import type { passwordResets, passwordResetsId } from './passwordResets';
 import type { periods, periodsId } from './periods';
@@ -28,11 +29,12 @@ export interface usersAttributes {
   createdAt?: Date;
   updatedAt?: Date;
   superAdmin: number;
+  notificationToken?: string;
 }
 
 export type usersPk = "id";
 export type usersId = users[usersPk];
-export type usersOptionalAttributes = "emailLc" | "passwordHash" | "firstName" | "lastName" | "fullName" | "emailConfirmed" | "profilePictureUrl" | "preferredLanguage" | "forcePasswordChange" | "emojiClickedCount" | "createdAt" | "updatedAt" | "superAdmin";
+export type usersOptionalAttributes = "emailLc" | "passwordHash" | "firstName" | "lastName" | "fullName" | "emailConfirmed" | "profilePictureUrl" | "preferredLanguage" | "forcePasswordChange" | "emojiClickedCount" | "createdAt" | "updatedAt" | "superAdmin" | "notificationToken";
 export type usersCreationAttributes = Optional<usersAttributes, usersOptionalAttributes>;
 
 export class users extends Model<usersAttributes, usersCreationAttributes> implements usersAttributes {
@@ -51,6 +53,7 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
   createdAt?: Date;
   updatedAt?: Date;
   superAdmin!: number;
+  notificationToken?: string;
 
   // users hasMany calSubscriptions via userId
   calSubscriptions!: calSubscriptions[];
@@ -76,6 +79,18 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
   hasGuardianOfCalSubscription!: Sequelize.HasManyHasAssociationMixin<calSubscriptions, calSubscriptionsId>;
   hasGuardianOfCalSubscriptions!: Sequelize.HasManyHasAssociationsMixin<calSubscriptions, calSubscriptionsId>;
   countGuardianOfCalSubscriptions!: Sequelize.HasManyCountAssociationsMixin;
+  // users hasMany eventUsers via userId
+  eventUsers!: eventUsers[];
+  getEventUsers!: Sequelize.HasManyGetAssociationsMixin<eventUsers>;
+  setEventUsers!: Sequelize.HasManySetAssociationsMixin<eventUsers, eventUsersId>;
+  addEventUser!: Sequelize.HasManyAddAssociationMixin<eventUsers, eventUsersId>;
+  addEventUsers!: Sequelize.HasManyAddAssociationsMixin<eventUsers, eventUsersId>;
+  createEventUser!: Sequelize.HasManyCreateAssociationMixin<eventUsers>;
+  removeEventUser!: Sequelize.HasManyRemoveAssociationMixin<eventUsers, eventUsersId>;
+  removeEventUsers!: Sequelize.HasManyRemoveAssociationsMixin<eventUsers, eventUsersId>;
+  hasEventUser!: Sequelize.HasManyHasAssociationMixin<eventUsers, eventUsersId>;
+  hasEventUsers!: Sequelize.HasManyHasAssociationsMixin<eventUsers, eventUsersId>;
+  countEventUsers!: Sequelize.HasManyCountAssociationsMixin;
   // users hasMany events via createdById
   events!: events[];
   getEvents!: Sequelize.HasManyGetAssociationsMixin<events>;
@@ -303,6 +318,10 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: 0
+    },
+    notificationToken: {
+      type: DataTypes.STRING(255),
+      allowNull: true
     }
   }, {
     sequelize,
