@@ -18,6 +18,12 @@ export const createEventSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).optional().default('published'),
   planId: z.number().nullable().optional(),
   baseEventId: z.number().nullable().optional(),
+  forAllAthletes: z.boolean().optional().default(true),
+  forAllStaff: z.boolean().optional().default(true),
+  registrationRequired: z.boolean().optional().default(true),
+  userIds: z.array(z.string()).optional(),
+  defaultIn: z.boolean().optional(),
+  staffDefaultIn: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   const hasStart = data.startTimeUnixSec != null;
   const hasEnd = data.endTimeUnixSec != null;
@@ -59,4 +65,9 @@ export const createEventPlanPartTypeSchema = z.object({
   teamId: z.string().optional(),
   userId: z.string().optional(),
   position: z.number().optional(),
+});
+
+export const updateAttendanceSchema = z.object({
+  repeatId: z.string().optional(), // For recurring events
+  attends: z.boolean().nullable() // null to delete attendance
 });

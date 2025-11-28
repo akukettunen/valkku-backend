@@ -25,13 +25,15 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     durationInMinutes,
     baseEventId,
     planId,
-    forAllAthletes
+    forAllAthletes,
+    forAllStaff,
+    registrationRequired
   } = event;
 
   const toNull = (v: any) => (v === undefined ? null : v);
   const exec = trx ? trx.query.bind(trx) : query;
   const result = await exec(`
-    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes, baseEventId, planId, forAllAthletes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes, baseEventId, planId, forAllAthletes, forAllStaff, registrationRequired) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     toNull(id),
     teamId,
@@ -53,7 +55,9 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     toNull(durationInMinutes),
     toNull(baseEventId),
     toNull(planId),
-    forAllAthletes !== undefined ? forAllAthletes : true
+    forAllAthletes !== undefined ? forAllAthletes : true,
+    forAllStaff !== undefined ? forAllStaff : true,
+    registrationRequired !== undefined ? registrationRequired : true
   ]);
   return result;
 };
@@ -87,44 +91,127 @@ export const getEventsByTeamIdRange = async (teamId: string, startDate: string, 
   return result as (PublicEvent & { addedByName: string, addedByEmail: string, addedById: string })[];
 };
 
-export const getTeamEvents = async (teamId: string, userId?: string) => {
-  const result = await query(`
-    SELECT
-      events.*,
-      locations.*,
-      events.id as id,
-      locations.id as locationId,
-      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
-      user_event_attendances.attends
-    FROM events
-    LEFT JOIN locations ON events.locationId = locations.id
-    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
-    WHERE events.teamId = ?
-    ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
-  `, [userId, teamId]);
+export const getTeamEvents = async (teamId: string, userId?: string, isAthlete: boolean = false) => {
+  let sql;
+  let params;
+
+  if (isAthlete) {
+    // Athletes see events where forAllAthletes=1 OR they created it OR they're invited
+    sql = `
+      SELECT
+        events.*,
+        locations.*,
+        events.id as id,
+        locations.id as locationId,
+        DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+        user_event_attendances.attends
+      FROM events
+      LEFT JOIN locations ON events.locationId = locations.id
+      LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
+      WHERE events.teamId = ?
+        AND (
+          events.forAllAthletes = 1
+          OR events.createdById = ?
+          OR EXISTS (
+            SELECT 1 FROM event_users eu
+            WHERE eu.eventId = events.id AND eu.userId = ?
+          )
+        )
+      ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
+    `;
+    params = [userId, teamId, userId, userId];
+  } else {
+    // Staff see ALL events in the team
+    sql = `
+      SELECT
+        events.*,
+        locations.*,
+        events.id as id,
+        locations.id as locationId,
+        DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+        user_event_attendances.attends
+      FROM events
+      LEFT JOIN locations ON events.locationId = locations.id
+      LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
+      WHERE events.teamId = ?
+      ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
+    `;
+    params = [userId, teamId];
+  }
+
+  const result = await query(sql, params);
   return result as (Event & { attends: boolean })[];
 };
 
-export const getTeamEventsWithAttendanceCount = async (teamId: string, userId?: string) => {
-  const result = await query(`
-    SELECT
-      events.*,
-      locations.*,
-      events.id as id,
-      locations.id as locationId,
-      DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
-      user_event_attendances.attends,
-      (
-        SELECT COUNT(*)
-        FROM user_event_attendances uea
-        WHERE uea.eventId = events.id AND uea.attends = 1
-      ) as attendeeCount
-    FROM events
-    LEFT JOIN locations ON events.locationId = locations.id
-    LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
-    WHERE events.teamId = ?
-    ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
-  `, [userId, teamId]);
+export const getTeamEventsWithAttendanceCount = async (teamId: string, userId?: string, isAthlete: boolean = false) => {
+  let sql;
+  let params;
+
+  if (isAthlete) {
+    // Athletes see events where forAllAthletes=1 OR they created it OR they're invited
+    sql = `
+      SELECT
+        events.*,
+        locations.*,
+        events.id as id,
+        locations.id as locationId,
+        DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+        user_event_attendances.attends,
+        (
+          SELECT COUNT(*)
+          FROM user_event_attendances uea
+          WHERE uea.eventId = events.id AND uea.attends = 1
+        ) as attendeeCount,
+        (
+          SELECT GROUP_CONCAT(eu.userId)
+          FROM event_users eu
+          WHERE eu.eventId = events.id
+        ) as eventUserIds
+      FROM events
+      LEFT JOIN locations ON events.locationId = locations.id
+      LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
+      WHERE events.teamId = ?
+        AND (
+          events.forAllAthletes = 1
+          OR events.createdById = ?
+          OR EXISTS (
+            SELECT 1 FROM event_users eu2
+            WHERE eu2.eventId = events.id AND eu2.userId = ?
+          )
+        )
+      ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
+    `;
+    params = [userId, teamId, userId, userId];
+  } else {
+    // Staff see ALL events in the team
+    sql = `
+      SELECT
+        events.*,
+        locations.*,
+        events.id as id,
+        locations.id as locationId,
+        DATE_FORMAT(events.eventDate, '%Y-%m-%d') as eventDateYmd,
+        user_event_attendances.attends,
+        (
+          SELECT COUNT(*)
+          FROM user_event_attendances uea
+          WHERE uea.eventId = events.id AND uea.attends = 1
+        ) as attendeeCount,
+        (
+          SELECT GROUP_CONCAT(eu.userId)
+          FROM event_users eu
+          WHERE eu.eventId = events.id
+        ) as eventUserIds
+      FROM events
+      LEFT JOIN locations ON events.locationId = locations.id
+      LEFT JOIN user_event_attendances ON (user_event_attendances.eventId = events.id AND user_event_attendances.userId = ?)
+      WHERE events.teamId = ?
+      ORDER BY events.eventDate ASC, events.startTimeUnixSec ASC
+    `;
+    params = [userId, teamId];
+  }
+
+  const result = await query(sql, params);
   return result as (Event & { attends: boolean; attendeeCount: number })[];
 };
 

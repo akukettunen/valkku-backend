@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS `events` (
   `locationId` int DEFAULT NULL,
   `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `forAllAthletes` tinyint(1) NOT NULL DEFAULT '1',
+  `forAllUsers` tinyint(1) NOT NULL DEFAULT '1',
   `timezone` varchar(50) NOT NULL DEFAULT 'Europe/Helsinki',
   PRIMARY KEY (`id`),
   KEY `teamId` (`teamId`),

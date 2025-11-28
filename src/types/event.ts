@@ -34,6 +34,8 @@ export interface Event {
   planId?: number | null;
   baseEventId?: number | null; // Reference to the first occurrence in a series of repeating events
   forAllAthletes?: boolean;
+  forAllStaff?: boolean;
+  registrationRequired?: boolean;
 
   createdById: string;
   deleted: boolean;

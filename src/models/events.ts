@@ -1,5 +1,6 @@
 import * as Sequelize from 'sequelize';
 import { DataTypes, Model, Optional } from 'sequelize';
+import type { eventUsers, eventUsersId } from './eventUsers';
 import type { locations, locationsId } from './locations';
 import type { plans, plansId } from './plans';
 import type { teams, teamsId } from './teams';
@@ -27,14 +28,17 @@ export interface eventsAttributes {
   locationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
-  forAllAthletes: number;
   timezone: string;
   baseEventId?: number;
+  registrationRequired: number;
+  forAllAthletes: number;
+  forAllUsers: number;
+  forAllStaff?: number;
 }
 
 export type eventsPk = "id";
 export type eventsId = events[eventsPk];
-export type eventsOptionalAttributes = "id" | "status" | "createdById" | "notes" | "ownNotes" | "coachesNotes" | "startTimeUnixSec" | "endTimeUnixSec" | "durationInMinutes" | "repeats" | "repeatsOn" | "repeatsUntilUnixSec" | "planId" | "locationId" | "createdAt" | "updatedAt" | "forAllAthletes" | "timezone" | "baseEventId";
+export type eventsOptionalAttributes = "id" | "status" | "createdById" | "notes" | "ownNotes" | "coachesNotes" | "startTimeUnixSec" | "endTimeUnixSec" | "durationInMinutes" | "repeats" | "repeatsOn" | "repeatsUntilUnixSec" | "planId" | "locationId" | "createdAt" | "updatedAt" | "timezone" | "baseEventId" | "registrationRequired" | "forAllAthletes" | "forAllUsers" | "forAllStaff";
 export type eventsCreationAttributes = Optional<eventsAttributes, eventsOptionalAttributes>;
 
 export class events extends Model<eventsAttributes, eventsCreationAttributes> implements eventsAttributes {
@@ -58,10 +62,25 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
   locationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
-  forAllAthletes!: number;
   timezone!: string;
   baseEventId?: number;
+  registrationRequired!: number;
+  forAllAthletes!: number;
+  forAllUsers!: number;
+  forAllStaff?: number;
 
+  // events hasMany eventUsers via eventId
+  eventUsers!: eventUsers[];
+  getEventUsers!: Sequelize.HasManyGetAssociationsMixin<eventUsers>;
+  setEventUsers!: Sequelize.HasManySetAssociationsMixin<eventUsers, eventUsersId>;
+  addEventUser!: Sequelize.HasManyAddAssociationMixin<eventUsers, eventUsersId>;
+  addEventUsers!: Sequelize.HasManyAddAssociationsMixin<eventUsers, eventUsersId>;
+  createEventUser!: Sequelize.HasManyCreateAssociationMixin<eventUsers>;
+  removeEventUser!: Sequelize.HasManyRemoveAssociationMixin<eventUsers, eventUsersId>;
+  removeEventUsers!: Sequelize.HasManyRemoveAssociationsMixin<eventUsers, eventUsersId>;
+  hasEventUser!: Sequelize.HasManyHasAssociationMixin<eventUsers, eventUsersId>;
+  hasEventUsers!: Sequelize.HasManyHasAssociationsMixin<eventUsers, eventUsersId>;
+  countEventUsers!: Sequelize.HasManyCountAssociationsMixin;
   // events belongsTo events via baseEventId
   baseEvent!: events;
   getBaseEvent!: Sequelize.BelongsToGetAssociationMixin<events>;
@@ -215,11 +234,6 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
       allowNull: true,
       defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     },
-    forAllAthletes: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: 1
-    },
     timezone: {
       type: DataTypes.STRING(50),
       allowNull: false,
@@ -232,6 +246,26 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
         model: 'events',
         key: 'id'
       }
+    },
+    registrationRequired: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: 1
+    },
+    forAllAthletes: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: 1
+    },
+    forAllUsers: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: 1
+    },
+    forAllStaff: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: 1
     }
   }, {
     sequelize,

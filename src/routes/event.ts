@@ -3,11 +3,12 @@ import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { withTransaction } from '@/db/index';
 import { createEvent, getEventById } from '@/db/event';
-import { createEventSchema } from '@/schemas/event';
+import { createEventSchema, updateAttendanceSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
 import { query } from '@/db/index';
 import { hasRoleInTeam } from '@/utils/authHelper';
 import { getPlanByEventId } from '@/utils/planHelper';
+import { syncEventUsers, setDefaultAttendance, filterEventsByUserAccess, getFilteredTeamEvents } from '@/utils/eventHelper';
 import { Event } from '@/types/event';
 import { models } from '@/db/index';
 import { Op } from 'sequelize';
@@ -17,7 +18,8 @@ const router: Router = Router();
 
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
-  const eventData = req.body;
+  const { userIds, defaultIn, staffDefaultIn, ...eventData } = req.body;
+  console.log("USER IDS: ", userIds)
 
   // If this is a weekly repeating event, generate all occurrences and save them
   if (eventData.repeats === 'weekly' && eventData.repeatsUntilUnixSec) {
@@ -113,6 +115,21 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
         [baseEventId, baseEventId]
       );
 
+      // Sync event users for first occurrence if userIds provided
+      if (userIds && userIds.length > 0) {
+        await syncEventUsers(baseEventId, userIds, teamId, eventData.forAllAthletes !== false, eventData.forAllStaff !== false, trx);
+      }
+
+      // Set default attendance for first occurrence if defaultIn is true
+      if (defaultIn) {
+        await setDefaultAttendance(baseEventId, teamId, userIds, firstOccurrence.eventDate, true, trx);
+      }
+
+      // Set default attendance for staff if staffDefaultIn is true
+      if (staffDefaultIn) {
+        await setDefaultAttendance(baseEventId, teamId, userIds, firstOccurrence.eventDate, false, trx);
+      }
+
       // Create remaining occurrences with baseEventId set to first occurrence's ID
       const createdEvents = [{ id: baseEventId, ...firstOccurrence }];
       for (let i = 1; i < occurrences.length; i++) {
@@ -124,7 +141,23 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
           eventDate: occurrence.eventDate // Explicitly ensure eventDate is set
         };
         const result = await createEvent(occurrenceWithBase, req.user?.sub!, trx);
-        createdEvents.push({ id: result.insertId, ...occurrence });
+        const occurrenceId = result.insertId;
+        createdEvents.push({ id: occurrenceId, ...occurrence });
+
+        // Sync event users for this occurrence if userIds provided
+        if (userIds && userIds.length > 0) {
+          await syncEventUsers(occurrenceId, userIds, teamId, eventData.forAllAthletes !== false, eventData.forAllStaff !== false, trx);
+        }
+
+        // Set default attendance for this occurrence if defaultIn is true
+        if (defaultIn) {
+          await setDefaultAttendance(occurrenceId, teamId, userIds, occurrence.eventDate, true, trx);
+        }
+
+        // Set default attendance for staff if staffDefaultIn is true
+        if (staffDefaultIn) {
+          await setDefaultAttendance(occurrenceId, teamId, userIds, occurrence.eventDate, false, trx);
+        }
       }
 
       return createdEvents[0];
@@ -139,7 +172,27 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
     });
   } else {
     // Non-repeating event - create as before
-    const eventCreateData = await createEvent({...req.body, teamId}, req.user?.sub!);
+    const eventCreateData = await withTransaction(async (trx) => {
+      const result = await createEvent({...eventData, teamId}, req.user?.sub!, trx);
+      const eventId = result.insertId;
+
+      // Sync event users if userIds provided
+      if (userIds && userIds.length > 0) {
+        await syncEventUsers(eventId, userIds, teamId, eventData.forAllAthletes !== false, eventData.forAllStaff !== false, trx);
+      }
+
+      // Set default attendance if defaultIn is true
+      if (defaultIn) {
+        await setDefaultAttendance(eventId, teamId, userIds, eventData.eventDate, true, trx);
+      }
+
+      // Set default attendance for staff if staffDefaultIn is true
+      if (staffDefaultIn) {
+        await setDefaultAttendance(eventId, teamId, userIds, eventData.eventDate, false, trx);
+      }
+
+      return result;
+    });
 
     const id = eventCreateData.insertId;
     const [ event ] = await getEventById(id);
@@ -155,7 +208,9 @@ router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requi
 router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:update', 'team'), async (req: Request, res: Response) => {
   const { eventId, teamId } = req.params as { eventId: string; teamId: string };
   const { editMode, recurrenceDate } = req.query as { editMode?: 'this' | 'all' | 'thisAndAfter'; recurrenceDate?: string };
-  const updates = req.body;
+  const { userIds, ...updates } = req.body;
+
+  console.log("USER IDS: ", userIds)
 
   const events = await getEventById(eventId);
   const event = events[0];
@@ -181,7 +236,9 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
     status = ?,
     durationInMinutes = ?,
     planId = ?,
-    forAllAthletes = ?`;
+    forAllAthletes = ?,
+    forAllStaff = ?,
+    registrationRequired = ?`;
 
   const commonValues = [
     merged.title,
@@ -197,7 +254,9 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
     toNull(merged.status) || 'published',
     toNull(merged.durationInMinutes),
     toNull(merged.planId),
-    merged.forAllAthletes !== undefined ? merged.forAllAthletes : true
+    merged.forAllAthletes !== undefined ? merged.forAllAthletes : true,
+    merged.forAllStaff !== undefined ? merged.forAllStaff : true,
+    merged.registrationRequired !== undefined ? merged.registrationRequired : true
   ];
 
   await withTransaction(async (trx) => {
@@ -334,6 +393,8 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
           toNull(merged.durationInMinutes),
           toNull(merged.planId),
           merged.forAllAthletes !== undefined ? merged.forAllAthletes : true,
+          merged.forAllStaff !== undefined ? merged.forAllStaff : true,
+          merged.registrationRequired !== undefined ? merged.registrationRequired : true,
           seriesEvent.id,
           teamId
         ];
@@ -350,12 +411,38 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
           `, [newRepeatsOn, event.baseEventId]);
         }
       }
+
+      // Sync event users if userIds provided
+      if (userIds !== undefined) {
+        for (const seriesEvent of seriesEvents) {
+          await syncEventUsers(
+            seriesEvent.id,
+            userIds || [],
+            teamId,
+            merged.forAllAthletes !== false,
+            merged.forAllStaff !== false,
+            trx
+          );
+        }
+      }
     } else {
       // Edit single event: either standalone or specific occurrence (can change eventDate)
       await trx.query(`
         UPDATE events SET ${updateFields}
         WHERE id = ? AND teamId = ?
       `, [...commonValues, eventId, teamId]);
+
+      // Sync event users if userIds provided
+      if (userIds !== undefined) {
+        await syncEventUsers(
+          parseInt(eventId),
+          userIds || [],
+          teamId,
+          merged.forAllAthletes !== false,
+          merged.forAllStaff !== false,
+          trx
+        );
+      }
     }
   });
 
@@ -432,41 +519,23 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
   const { teamId } = req.params as { teamId: string };
   const { startDate, endDate, date, withPlans } = req.query as { startDate: string, endDate: string, date: string, withPlans: 'true' | 'false' };
 
-  // Build where clause based on date parameters
-  const where: any = { teamId };
-  if (date) {
-    // Single date - normalize to YYYY-MM-DD format
-    const dateStr = date.split('T')[0];
-    where.eventDate = dateStr;
-  } else if (startDate && endDate) {
-    // Date range
-    const startStr = startDate.split('T')[0];
-    const endStr = endDate.split('T')[0];
-    where.eventDate = {
-      [Op.between]: [startStr, endStr]
-    };
-  }
+  // Get user's roles for this team
+  const userTeam = req.user?.teams.find(t => t.teamId === teamId);
+  const userRoles = userTeam?.roles || [];
 
-  const eventRows = await models.events.findAll({
-    where,
-    order: [['eventDate', 'ASC'], ['startTimeUnixSec', 'ASC']],
-    include: [
-      {
-        model: models.locations,
-        as: 'location'
-      },
-      {
-        model: models.userEventAttendances,
-        as: 'userEventAttendances',
-        required: false,
-        include: [
-          { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
-        ]
-      }
-    ]
-  });
-
-  const events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+  // Fetch and filter events using unified helper
+  const events = await getFilteredTeamEvents(
+    teamId,
+    req.user?.sub!,
+    userRoles,
+    {
+      date,
+      startDate,
+      endDate,
+      withPlans: withPlans === 'true',
+      includeAttendances: true
+    }
+  );
 
   // Filter notes based on permissions
   for(const event of events) {
@@ -475,13 +544,6 @@ router.get('/team/:teamId', requireSignedIn, requireScope('event:read', 'team'),
     }
     if(!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
       (event as any).coachesNotes = undefined;
-    }
-  }
-
-  // Add plans if requested
-  if(withPlans === 'true') {
-    for (const event of events) {
-      (event as any).plan = await getPlanByEventId(event.id, teamId);
     }
   }
 
@@ -512,6 +574,14 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
         include: [
           { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
         ]
+      },
+      {
+        model: models.eventUsers,
+        as: 'eventUsers',
+        required: false,
+        include: [
+          { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
+        ]
       }
     ]
   });
@@ -522,6 +592,33 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
 
   const event = eventModel.get({ plain: true });
 
+  // Check user's role in this team
+  const userTeam = req.user?.teams.find(t => t.teamId === teamId);
+  const isStaff = userTeam?.roles.some(r => ['owner', 'admin', 'coach'].includes(r.role)) || false;
+  const isAthlete = userTeam?.roles.some(r => r.role === 'athlete' && !r.guardianOf) || false;
+  const guardianRole = userTeam?.roles.find(r => r.role === 'guardian' && r.guardianOf);
+
+  // For guardians, check access as if we're the guarded person
+  const checkUserId = guardianRole?.guardianOf || req.user?.sub;
+
+  // Check if user has access to this event
+  let hasAccess = false;
+
+  // Staff always have access to all events
+  if (isStaff) {
+    hasAccess = true;
+  } else if (event.createdById === checkUserId) {
+    hasAccess = true;
+  } else if ((isAthlete || guardianRole) && event.forAllAthletes) {
+    hasAccess = true;
+  } else if ((event as any).eventUsers?.some((eu: any) => eu.userId === checkUserId)) {
+    hasAccess = true;
+  }
+
+  if (!hasAccess) {
+    throw new AppError('Event not found', 404, 'event_not_found');
+  }
+
   // Filter notes based on permissions
   if(event.createdById !== req.user?.sub) {
     delete event.ownNotes;
@@ -529,6 +626,13 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
 
   if(!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
     delete event.coachesNotes;
+  }
+
+  // Extract userIds from eventUsers relation
+  if ((event as any).eventUsers) {
+    (event as any).userIds = (event as any).eventUsers.map((eu: any) => eu.userId);
+  } else {
+    (event as any).userIds = [];
   }
 
   return res.status(200).json({
@@ -619,6 +723,75 @@ router.post('/:eventId/user/:userId/attendance', requireSignedIn, requireScope('
       eventId,
       repeatId: attendanceRepeatId,
       attendance
+    }
+  });
+});
+
+// Update user attendance - for staff only
+router.patch('/:eventId/team/:teamId/user/:userId/attendance', requireSignedIn, validate(updateAttendanceSchema), requireScope('event:attendance:update', 'team'), async (req: Request, res: Response) => {
+  const { eventId, teamId, userId } = req.params as { eventId: string; teamId: string; userId: string };
+  const { repeatId, attends } = req.body as { repeatId?: string; attends: boolean | null };
+
+  // Verify the event exists and belongs to the team
+  const [event] = await getEventById(eventId);
+  if (!event || event.teamId !== teamId) {
+    throw new AppError('Event not found', 404, 'event_not_found');
+  }
+
+  // Verify user has staff role in this team
+  if (!hasRoleInTeam(req.user!, teamId, ['owner', 'admin', 'coach'])) {
+    throw new AppError('Only staff members can edit attendances', 403, 'forbidden');
+  }
+
+  // Verify the user belongs to the team
+  const [teamUser] = await query(`
+    SELECT userId FROM team_users
+    WHERE teamId = ? AND userId = ?
+  `, [teamId, userId]) as Array<{ userId: string }>;
+
+  if (!teamUser) {
+    throw new AppError('User not found in team', 404, 'user_not_found');
+  }
+
+  // For recurring events, use the provided repeatId or the event's date
+  const attendanceRepeatId = repeatId || event.eventDate;
+
+  if (attends === null) {
+    // Delete attendance record
+    await query(`
+      DELETE FROM user_event_attendances
+      WHERE userId = ? AND eventId = ? AND repeatId = ?
+    `, [userId, eventId, attendanceRepeatId]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Attendance deleted successfully',
+      data: {
+        eventId,
+        userId,
+        repeatId: attendanceRepeatId,
+        attends: null
+      }
+    });
+  }
+
+  // Create or update attendance
+  await query(`
+    INSERT INTO user_event_attendances (userId, eventId, repeatId, attends)
+    VALUES (?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      attends = VALUES(attends),
+      updatedAt = CURRENT_TIMESTAMP
+  `, [userId, eventId, attendanceRepeatId, attends]);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Attendance updated successfully',
+    data: {
+      eventId,
+      userId,
+      repeatId: attendanceRepeatId,
+      attends
     }
   });
 });

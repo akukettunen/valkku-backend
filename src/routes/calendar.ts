@@ -99,7 +99,8 @@ router.get("/:token", async (req: Request, res: Response) => {
   }
 
   // 3. Fetch team events
-  const events = (await getTeamEventsWithAttendanceCount(sub.teamId, sub.guardianOfId || sub.userId)) as unknown as EventInput[];
+  const isAthlete = sub.role === 'athlete' || sub.role === 'guardian';
+  const events = (await getTeamEventsWithAttendanceCount(sub.teamId, sub.guardianOfId || sub.userId, isAthlete)) as unknown as EventInput[];
   if (!events) {
     throw new AppError("Team not found", 404, "team_not_found");
   }
