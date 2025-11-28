@@ -20,8 +20,9 @@ export default {
     "team:update": ["owner", "admin"],
     "team:invite": ["owner", "admin"],
     "team:leave": ["owner", "admin", "athlete", "guardian"],
+
     "membership:create": ["owner", "admin"],
-    "membership:read": ["owner", "admin", "coach"],
+    "membership:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "membership:delete": ["owner", "admin"], // owner membership cannot be removed
     "team:transfer_ownership": ["owner"],
 
@@ -62,6 +63,11 @@ export default {
     "folder:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "folder:update": ["owner", "admin", "coach"],
     "folder:delete": ["owner", "admin", "coach"],
+
+    "event:attendance:create": ["owner", "admin", "coach"],
+    "event:attendance:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "event:attendance:delete": ["owner", "admin", "coach"],
+    "event:attendance:update": ["owner", "admin", "coach"],
   },
   "individual": { // actions regarding ones own stuff
     "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete
@@ -72,6 +78,7 @@ export default {
     "event:attendance:create": ["self", "guardian-as-athlete"],
     "event:attendance:read": ["self", "guardian-as-athlete"],
     "event:attendance:delete": ["self", "guardian-as-athlete"],
+    "event:attendance:update": ["self", "guardian-as-athlete"],
 
     "plan-part-type:create": ["self", "guardian-as-athlete"],
     "plan-part-type:update": ["self", "guardian-as-athlete"],

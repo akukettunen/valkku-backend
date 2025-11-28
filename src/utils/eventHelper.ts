@@ -1,4 +1,5 @@
 import { getEventsByTeamIdDate, getEventsByTeamIdRange, getTeamEvents, getEventById } from "@/db/event";
+import { query, Transaction } from "@/db/index";
 import { AppError } from "@/middleware/errors";
 import type { Event } from "@/types/event";
 
@@ -306,7 +307,144 @@ const applyExceptions = async (
   return result;
 };
 
-export const fetchTeamEvents = async (teamId: string, date: string, startDate: string, endDate: string, userId?: string) => {
+/**
+ * Filter events based on user access
+ * Athletes: See events where forAllAthletes=1 OR they created it OR they're invited
+ * Staff: See events where forAllStaff=1 OR they created it OR they're invited
+ */
+export const filterEventsByUserAccess = (events: Event[], userId: string, isAthlete: boolean): Event[] => {
+  return events.filter((event: any) => {
+    // Allow if user created the event
+    if (event.createdById === userId) {
+      return true;
+    }
+
+    // Allow based on role
+    if (isAthlete) {
+      if (event.forAllAthletes === 1 || event.forAllAthletes === true) {
+        return true;
+      }
+    } else {
+      if (event.forAllStaff === 1 || event.forAllStaff === true) {
+        return true;
+      }
+    }
+
+    // Allow if user is invited (exists in eventUsers array)
+    if (event.eventUsers && Array.isArray(event.eventUsers)) {
+      const isInvited = event.eventUsers.some((eu: any) => eu.userId === userId);
+      if (isInvited) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+};
+
+/**
+ * Fetch and filter events for a team with all necessary relations
+ * This is the unified function used by both API routes and calendar generation
+ */
+export const getFilteredTeamEvents = async (
+  teamId: string,
+  userId: string,
+  userRoles: Array<{ role: string; guardianOf?: string | null }>,
+  options?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    withPlans?: boolean;
+    includeAttendances?: boolean;
+  }
+) => {
+  const { models } = await import('@/db/index');
+  const { Op } = await import('sequelize');
+
+  // Build where clause based on date parameters
+  const where: any = { teamId };
+  if (options?.date) {
+    const dateStr = options.date.split('T')[0];
+    where.eventDate = dateStr;
+  } else if (options?.startDate && options?.endDate) {
+    const startStr = options.startDate.split('T')[0];
+    const endStr = options.endDate.split('T')[0];
+    where.eventDate = {
+      [Op.between]: [startStr, endStr]
+    };
+  }
+
+  // Determine user's role
+  const isStaff = userRoles.some(r => ['owner', 'admin', 'coach'].includes(r.role));
+  const isAthlete = userRoles.some(r => r.role === 'athlete' && !r.guardianOf);
+  const guardianRole = userRoles.find(r => r.role === 'guardian' && r.guardianOf);
+
+  // For guardians, filter events as if we're the guarded person
+  const filterUserId = guardianRole?.guardianOf || userId;
+
+  // Build include array
+  const include: any[] = [
+    {
+      model: models.locations,
+      as: 'location'
+    },
+    {
+      model: models.eventUsers,
+      as: 'eventUsers',
+      required: false,
+      include: [
+        { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
+      ]
+    }
+  ];
+
+  // Optionally include attendances
+  if (options?.includeAttendances) {
+    include.push({
+      model: models.userEventAttendances,
+      as: 'userEventAttendances',
+      required: false,
+      include: [
+        { model: models.users, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }
+      ]
+    });
+  }
+
+  // Fetch events
+  const eventRows = await models.events.findAll({
+    where,
+    order: [['eventDate', 'ASC'], ['startTimeUnixSec', 'ASC']],
+    include
+  });
+
+  let events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+
+  // Staff see all events, athletes/guardians get filtered
+  if (!isStaff) {
+    events = filterEventsByUserAccess(events, filterUserId, isAthlete || !!guardianRole);
+  }
+
+  // Extract userIds from eventUsers relation
+  for (const event of events) {
+    if ((event as any).eventUsers) {
+      (event as any).userIds = (event as any).eventUsers.map((eu: any) => eu.userId);
+    } else {
+      (event as any).userIds = [];
+    }
+  }
+
+  // Optionally add plans
+  if (options?.withPlans) {
+    const { getPlanByEventId } = await import('@/utils/planHelper');
+    for (const event of events) {
+      (event as any).plan = await getPlanByEventId(event.id, teamId);
+    }
+  }
+
+  return events;
+};
+
+export const fetchTeamEvents = async (teamId: string, date: string, startDate: string, endDate: string, userId?: string, isAthlete?: boolean) => {
   let events: Event[] = [];
 
   try {
@@ -318,6 +456,11 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
       order: [['eventDate', 'ASC']],
       include: [
         { model: models.locations },
+        {
+          model: models.eventUsers,
+          as: 'eventUsers',
+          required: false
+        },
         ...(userId ? [{
           model: models.userEventAttendances,
           as: 'userEventAttendances',
@@ -382,6 +525,11 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
       // No date filter - get all events (no repeats expansion needed)
       events = allEvents as Event[];
     }
+
+    // Filter events by user access if userId is provided
+    if (userId) {
+      events = filterEventsByUserAccess(events, userId, isAthlete || false);
+    }
   } catch (error) {
     console.error('❌ Error fetching team events:', error);
     throw new AppError('Failed to fetch team events', 500, 'something_went_wrong');
@@ -389,3 +537,183 @@ export const fetchTeamEvents = async (teamId: string, date: string, startDate: s
 
   return events;
 }
+
+/**
+ * Sync event_users records for a given event
+ * Deletes existing records and creates new ones based on userIds
+ */
+export const syncEventUsers = async (
+  eventId: number,
+  userIds: string[],
+  teamId: string,
+  forAllAthletes: boolean,
+  forAllStaff: boolean,
+  trx?: Transaction
+) => {
+  const exec = trx ? trx.query.bind(trx) : query;
+
+  // Delete existing event_users for this event
+  await exec(`DELETE FROM event_users WHERE eventId = ?`, [eventId]);
+
+  // If no userIds provided, nothing to insert
+  if (userIds.length === 0) {
+    return;
+  }
+
+  // Get the roles for each userId in the team to determine which users to keep
+  const placeholders = userIds.map(() => '?').join(', ');
+  const rolesResult = await exec(`
+    SELECT DISTINCT tur.userId, tur.role
+    FROM team_user_roles tur
+    WHERE tur.teamId = ? AND tur.userId IN (${placeholders})
+  `, [teamId, ...userIds]) as Array<{ userId: string, role: string }>;
+
+  // Group roles by userId
+  const userRoles = new Map<string, string[]>();
+  for (const row of rolesResult) {
+    if (!userRoles.has(row.userId)) {
+      userRoles.set(row.userId, []);
+    }
+    userRoles.get(row.userId)!.push(row.role);
+  }
+
+  // Filter userIds based on flags
+  const filteredUserIds = userIds.filter(userId => {
+    const roles = userRoles.get(userId) || [];
+
+    // Check if user is an athlete (has 'athlete' role)
+    const isAthlete = roles.includes('athlete');
+
+    // Check if user is staff (has owner, admin, or coach role)
+    const isStaff = roles.some(r => ['owner', 'admin', 'coach'].includes(r));
+
+    // If forAllAthletes is true, don't save athletes
+    if (forAllAthletes && isAthlete && !isStaff) {
+      return false;
+    }
+
+    // If forAllStaff is true, don't save staff
+    if (forAllStaff && isStaff && !isAthlete) {
+      return false;
+    }
+
+    // If user has both athlete and staff roles, check both conditions
+    if (isAthlete && isStaff) {
+      // Only exclude if both flags are true
+      if (forAllAthletes && forAllStaff) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Insert filtered event_users
+  if (filteredUserIds.length > 0) {
+    const insertPlaceholders = filteredUserIds.map(() => '(?, ?)').join(', ');
+    const values: any[] = [];
+    filteredUserIds.forEach(userId => {
+      values.push(eventId, userId);
+    });
+    await exec(`INSERT INTO event_users (eventId, userId) VALUES ${insertPlaceholders}`, values);
+  }
+};
+
+/**
+ * Set default attendance for users based on role
+ * If userIds is provided, sets attendance for those users
+ * Otherwise, sets attendance for all users with the specified role in the team
+ *
+ * @param forAthletes - If true, get athletes; if false, get staff (owner, admin, coach)
+ * @param userIds - Optional list of specific user IDs to set attendance for
+ */
+export const setDefaultAttendance = async (
+  eventId: number,
+  teamId: string,
+  userIds: string[] | undefined,
+  eventDate: string,
+  forAthletes: boolean,
+  trx?: Transaction
+) => {
+  const exec = trx ? trx.query.bind(trx) : query;
+
+  let targetUserIds: string[];
+
+  if (userIds !== undefined) {
+    // userIds was explicitly provided (could be empty or have values)
+    // Filter to only include users with the correct role
+    if (userIds.length === 0) {
+      // Empty array means no users to set attendance for
+      return;
+    }
+
+    // Get the roles of the provided users
+    const placeholders = userIds.map(() => '?').join(', ');
+    let roleCondition: string;
+    if (forAthletes) {
+      roleCondition = `tur.role = 'athlete'`;
+    } else {
+      roleCondition = `tur.role IN ('owner', 'admin', 'coach')`;
+    }
+
+    const filteredUsers = await exec(`
+      SELECT DISTINCT tur.userId
+      FROM team_user_roles tur
+      WHERE tur.teamId = ?
+        AND tur.userId IN (${placeholders})
+        AND ${roleCondition}
+    `, [teamId, ...userIds]) as Array<{ userId: string }>;
+
+    targetUserIds = filteredUsers.map(u => u.userId);
+  } else {
+    // userIds was not provided - get all users with the specified role
+    let roleCondition: string;
+    if (forAthletes) {
+      // Get all athletes (excluding guardian-only users)
+      roleCondition = `tur.role = 'athlete'`;
+    } else {
+      // Get all staff (owner, admin, coach) excluding guardian-only users
+      roleCondition = `tur.role IN ('owner', 'admin', 'coach')`;
+    }
+
+    const users = await exec(`
+      SELECT DISTINCT tur.userId
+      FROM team_user_roles tur
+      INNER JOIN team_users tu ON tur.userId = tu.userId AND tur.teamId = tu.teamId
+      WHERE tur.teamId = ?
+        AND ${roleCondition}
+        AND tu.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM team_user_roles tur2
+          WHERE tur2.userId = tur.userId
+            AND tur2.teamId = tur.teamId
+            AND tur2.role = 'guardian'
+            AND NOT EXISTS (
+              SELECT 1 FROM team_user_roles tur3
+              WHERE tur3.userId = tur.userId
+                AND tur3.teamId = tur.teamId
+                AND tur3.role != 'guardian'
+            )
+        )
+    `, [teamId]) as Array<{ userId: string }>;
+
+    targetUserIds = users.map(u => u.userId);
+  }
+
+  // Insert attendance records for all relevant users
+  if (targetUserIds.length > 0) {
+    const placeholders = targetUserIds.map(() => '(?, ?, ?, ?)').join(', ');
+    const values: any[] = [];
+    targetUserIds.forEach(userId => {
+      values.push(userId, eventId, eventDate, true); // attends = true
+    });
+
+    await exec(`
+      INSERT INTO user_event_attendances (userId, eventId, repeatId, attends)
+      VALUES ${placeholders}
+      ON DUPLICATE KEY UPDATE
+        attends = VALUES(attends),
+        updatedAt = CURRENT_TIMESTAMP
+    `, values);
+  }
+};

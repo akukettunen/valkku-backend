@@ -28,7 +28,7 @@ export interface EventInput {
   createdAt?: string | null;
   updatedAt?: string | null;
 
-  forAllAthletes?: number | boolean | null;
+  forAllUsers?: number | boolean | null;
 
   // Attendance fields
   attends?: number | boolean | null;
