@@ -21,6 +21,8 @@ import periodRoutes from '@/routes/period';
 import folderRoutes from '@/routes/folder';
 import devRoutes from '@/routes/dev';
 import calendarRoutes from '@/routes/calendar';
+import unitRoutes from '@/routes/unit';
+import testRoutes from '@/routes/test';
 
 // Load environment variables with expansion
 dotenvExpand.expand(dotenv.config({ quiet: true }));
@@ -114,6 +116,8 @@ app.use('/api/plan', planRoutes);
 app.use('/api/period', periodRoutes);
 app.use('/api/folder', folderRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/unit', unitRoutes);
+app.use('/api/test', testRoutes);
 if (process.env['NODE_ENV'] !== 'test') {
   // Defer requiring event routes in tests to avoid mock shape mismatches
   // eslint-disable-next-line @typescript-eslint/no-var-requires

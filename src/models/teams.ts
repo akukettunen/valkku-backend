@@ -9,6 +9,7 @@ import type { planParts, planPartsId } from './planParts';
 import type { plans, plansId } from './plans';
 import type { teamUserRoles, teamUserRolesId } from './teamUserRoles';
 import type { teamUsers, teamUsersId } from './teamUsers';
+import type { tests, testsId } from './tests';
 import type { users, usersId } from './users';
 
 export interface teamsAttributes {
@@ -137,6 +138,18 @@ export class teams extends Model<teamsAttributes, teamsCreationAttributes> imple
   hasTeamUser!: Sequelize.HasManyHasAssociationMixin<teamUsers, teamUsersId>;
   hasTeamUsers!: Sequelize.HasManyHasAssociationsMixin<teamUsers, teamUsersId>;
   countTeamUsers!: Sequelize.HasManyCountAssociationsMixin;
+  // teams hasMany tests via teamId
+  tests!: tests[];
+  getTests!: Sequelize.HasManyGetAssociationsMixin<tests>;
+  setTests!: Sequelize.HasManySetAssociationsMixin<tests, testsId>;
+  addTest!: Sequelize.HasManyAddAssociationMixin<tests, testsId>;
+  addTests!: Sequelize.HasManyAddAssociationsMixin<tests, testsId>;
+  createTest!: Sequelize.HasManyCreateAssociationMixin<tests>;
+  removeTest!: Sequelize.HasManyRemoveAssociationMixin<tests, testsId>;
+  removeTests!: Sequelize.HasManyRemoveAssociationsMixin<tests, testsId>;
+  hasTest!: Sequelize.HasManyHasAssociationMixin<tests, testsId>;
+  hasTests!: Sequelize.HasManyHasAssociationsMixin<tests, testsId>;
+  countTests!: Sequelize.HasManyCountAssociationsMixin;
   // teams belongsToMany users via teamId and userId
   userIdUsers!: users[];
   getUserIdUsers!: Sequelize.BelongsToManyGetAssociationsMixin<users>;
