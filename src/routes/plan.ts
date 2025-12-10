@@ -717,61 +717,7 @@ router.get('/part/team/:teamId', requireSignedIn, requireScope('plan-part:read',
 });
 
 // CHECK
-router.get('/:planId/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
-  const { planId, teamId } = req.params as { planId: string, teamId: string };
 
-  const plan = await getPlanById(parseInt(planId), teamId);
-
-  if (!plan) {
-    throw new AppError('Plan not found', 404, 'plan_not_found');
-  }
-
-  res.status(200).json({
-    success: true,
-    message: 'Plan fetched successfully',
-    data: plan
-  });
-});
-
-// CHECK
-router.get('/event/:eventId/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
-  const { eventId, teamId } = req.params as { eventId: string, teamId: string };
-  const eventIdNumber = parseInt(eventId);
-  const plan = await getPlanByEventId(eventIdNumber, teamId);
-
-  res.status(200).json({
-    success: true,
-    message: 'Plan fetched successfully',
-    data: plan
-  });
-});
-
-// CHECK
-router.get('/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
-  const { teamId } = req.params as { teamId: string };
-  const { showInLibrary } = req.query as { showInLibrary?: 'true' | 'false' };
-  const showInLibraryBoolean = showInLibrary === 'true' ? 1 : showInLibrary === 'false' ? 0 : undefined;
-
-  // Build where clause
-  const whereClause: any = {
-    teamId
-  };
-
-  // Filter by showInLibrary if specified
-  if (showInLibraryBoolean !== undefined) {
-    whereClause.showInLibrary = showInLibraryBoolean;
-  }
-
-  const plans = await getPlansWithParts(whereClause);
-
-  res.status(200).json({
-    success: true,
-    message: 'Plans fetched successfully',
-    data: plans
-  });
-});
-
-// CHECK
 router.get('/plan-part-type/global', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
   const eventPlanPartTypes = await getPlanPartTypes('global', null, null, true);
 
@@ -824,6 +770,10 @@ router.get('/plan-part-type/me', requireSignedIn, async (req: Request, res: Resp
 router.put('/plan-part-type/:id', requireSignedIn, validateBasedOnScope('plan-part-type:update'), async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params as { id: string };
   let { titleObject, color, scope, archived, teamId, userId } = req.body as { titleObject: LocalizationObject, color: string, scope: EVENT_PLAN_PART_SCOPE, teamId: string | null | undefined, userId: string | null | undefined, archived: boolean };
+  console.log('scope', scope);
+  console.log('teamId', teamId);
+  console.log('userId', userId);
+  console.log('archived', archived);
 
   if(scope === 'team') {
     userId = null;
@@ -905,5 +855,63 @@ router.patch('/plan-part-type/positions/:teamId', requireSignedIn, validate(upda
     message: 'Event plan part type positions updated successfully'
   });
 });
+
+// CHECK
+router.get('/:planId/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  const { planId, teamId } = req.params as { planId: string, teamId: string };
+
+  const plan = await getPlanById(parseInt(planId), teamId);
+
+  if (!plan) {
+    throw new AppError('Plan not found', 404, 'plan_not_found');
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Plan fetched successfully',
+    data: plan
+  });
+});
+
+// CHECK
+router.get('/event/:eventId/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  const { eventId, teamId } = req.params as { eventId: string, teamId: string };
+  const eventIdNumber = parseInt(eventId);
+  const plan = await getPlanByEventId(eventIdNumber, teamId);
+
+  res.status(200).json({
+    success: true,
+    message: 'Plan fetched successfully',
+    data: plan
+  });
+});
+
+// CHECK
+router.get('/team/:teamId', requireSignedIn, requireScope('plan:read', 'team'), async (req: Request, res: Response, next: NextFunction) => {
+  const { teamId } = req.params as { teamId: string };
+  const { showInLibrary } = req.query as { showInLibrary?: 'true' | 'false' };
+  const showInLibraryBoolean = showInLibrary === 'true' ? 1 : showInLibrary === 'false' ? 0 : undefined;
+
+  // Build where clause
+  const whereClause: any = {
+    teamId
+  };
+
+  // Filter by showInLibrary if specified
+  if (showInLibraryBoolean !== undefined) {
+    whereClause.showInLibrary = showInLibraryBoolean;
+  }
+
+  const plans = await getPlansWithParts(whereClause);
+
+  res.status(200).json({
+    success: true,
+    message: 'Plans fetched successfully',
+    data: plans
+  });
+});
+
+// CHECK
+
 
 export default router;

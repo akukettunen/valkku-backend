@@ -210,8 +210,6 @@ router.put('/:eventId/team/:teamId', requireSignedIn, validate(createEventSchema
   const { editMode, recurrenceDate } = req.query as { editMode?: 'this' | 'all' | 'thisAndAfter'; recurrenceDate?: string };
   const { userIds, ...updates } = req.body;
 
-  console.log("USER IDS: ", userIds)
-
   const events = await getEventById(eventId);
   const event = events[0];
   if (!event || event.teamId !== teamId) {

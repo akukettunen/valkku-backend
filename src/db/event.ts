@@ -223,6 +223,9 @@ export const getPlanPartTypeById = async (id: string) => {
 };
 
 export const getPlanPartTypes = async (scope: OBJECT_SCOPE, teamId?: string | null, userId?: string | null, includeArchived: boolean = false) => {
+  console.log("scope", scope);
+  console.log("teamId", teamId);
+  console.log("userId", userId);
   console.log("includeArchived", includeArchived);
   const result = await query(`
     SELECT * FROM plan_part_types
