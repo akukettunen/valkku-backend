@@ -91,8 +91,9 @@ router.post('/groups/admin', requireSignedIn, requireSuperAdmin, async (req: Req
 
 // PUT /test/groups/admin/:id - Update test group (admin)
 router.put('/groups/admin/:id', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
     const { title } = req.body;
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const groupId = parseInt(id, 10);
 
     if (isNaN(groupId)) throw new AppError('Invalid ID', 400, 'validation_error');
@@ -108,7 +109,8 @@ router.put('/groups/admin/:id', requireSignedIn, requireSuperAdmin, async (req: 
 
 // DELETE /test/groups/admin/:id - Delete test group (admin)
 router.delete('/groups/admin/:id', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const groupId = parseInt(id, 10);
 
     if (isNaN(groupId)) throw new AppError('Invalid ID', 400, 'validation_error');
@@ -176,7 +178,8 @@ router.post('/admin', requireSignedIn, requireSuperAdmin, async (req: Request, r
 
 // PUT /test/admin/:id - Update global test
 router.put('/admin/:id', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const testId = parseInt(id, 10);
     const { title, notes, testGroupId, fillables, decimals } = req.body;
 
@@ -264,7 +267,8 @@ router.put('/admin/:id', requireSignedIn, requireSuperAdmin, async (req: Request
 
 // DELETE /test/admin/:id - Delete global test
 router.delete('/admin/:id', requireSignedIn, requireSuperAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params['id'];
+  if (!id) throw new AppError('Invalid test ID', 400, 'invalid_request');
   const testId = parseInt(id, 10);
   if (isNaN(testId)) throw new AppError('Invalid test ID', 400, 'invalid_request');
 
@@ -610,7 +614,8 @@ router.delete('/results/try', requireSignedIn, validateBasedOnScope('test-result
 
 // DELETE /test/results/:id - Delete a test result
 router.delete('/results/:id', requireSignedIn, validateBasedOnScope('test-result:delete'), async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const resultId = parseInt(id, 10);
     const { teamId, scope } = req.query;
 
@@ -744,7 +749,8 @@ router.post('/events', requireSignedIn, requireScope('test-event:create', 'team'
 
 // PUT /test/events/:id - Update test event
 router.put('/events/:id', requireSignedIn, requireScope('test-event:update', 'team'), async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const eventId = parseInt(id, 10);
     const { name, date, testIds } = req.body;
 
@@ -804,18 +810,22 @@ router.put('/events/:id', requireSignedIn, requireScope('test-event:update', 'te
         ]
     });
 
-    const plainEvent = updatedEvent?.get({ plain: true });
-    if (plainEvent) {
-        plainEvent.tests = plainEvent.testEventTests ? plainEvent.testEventTests.map((tet: any) => tet.test).filter((t: any) => t) : [];
-        delete plainEvent.testEventTests;
-    }
+    const plainEvent = (updatedEvent?.get({ plain: true }) as any) || null;
+    const data = plainEvent
+        ? {
+              ...plainEvent,
+              tests: plainEvent.testEventTests ? plainEvent.testEventTests.map((tet: any) => tet.test).filter((t: any) => t) : []
+          }
+        : null;
+    if (data) delete (data as any).testEventTests;
 
-    return res.status(200).json({ success: true, data: plainEvent });
+    return res.status(200).json({ success: true, data });
 });
 
 // DELETE /test/events/:id - Delete test event
 router.delete('/events/:id', requireSignedIn, requireScope('test-event:delete', 'team'), async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const eventId = parseInt(id, 10);
     if (isNaN(eventId)) throw new AppError('Invalid ID', 400, 'validation_error');
 
@@ -1006,7 +1016,8 @@ router.post('/', requireSignedIn, requireScope('test:create', 'team'), async (re
 
 // PUT /test/:id - Update test
 router.put('/:id', requireSignedIn, requireScope('test:update', 'team'), async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params['id'];
+    if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
     const testId = parseInt(id, 10);
     const { title, notes, testGroupId, fillables, decimals } = req.body;
 

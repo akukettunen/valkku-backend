@@ -9,7 +9,7 @@ export interface testFillablesAttributes {
   testId: number;
   unitId: number;
   title: object;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +24,7 @@ export class testFillables extends Model<testFillablesAttributes, testFillablesC
   testId!: number;
   unitId!: number;
   title!: object;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 

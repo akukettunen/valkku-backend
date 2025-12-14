@@ -10,12 +10,12 @@ export interface testResultsAttributes {
   id: number;
   userId: string;
   testId: number;
-  testEventId?: number;
+  testEventId?: number | null;
   date: string;
   createdById: string;
-  teamId?: string;
+  teamId?: string | null;
   tryOrder: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,12 +29,12 @@ export class testResults extends Model<testResultsAttributes, testResultsCreatio
   id!: number;
   userId!: string;
   testId!: number;
-  testEventId?: number;
+  testEventId?: number | null;
   date!: string;
   createdById!: string;
-  teamId?: string;
+  teamId?: string | null;
   tryOrder!: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 
