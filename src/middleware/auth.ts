@@ -53,7 +53,7 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
 
 export function validateBasedOnScope(action: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { scope } = req.body as { scope?: OBJECT_SCOPE };
+    const { scope } = (req.body?.scope ? req.body : req.query) as { scope?: OBJECT_SCOPE };
 
     if (!scope) throw new AppError('Scope is required', 400, 'something_went_wrong');
     if(!action) throw new AppError('Action is required', 400, 'something_went_wrong');

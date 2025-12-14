@@ -35,16 +35,24 @@ import { teamUsers as _teamUsers } from "./teamUsers";
 import type { teamUsersAttributes, teamUsersCreationAttributes } from "./teamUsers";
 import { teams as _teams } from "./teams";
 import type { teamsAttributes, teamsCreationAttributes } from "./teams";
+import { testEventTests as _testEventTests } from "./testEventTests";
+import type { testEventTestsAttributes, testEventTestsCreationAttributes } from "./testEventTests";
+import { testEvents as _testEvents } from "./testEvents";
+import type { testEventsAttributes, testEventsCreationAttributes } from "./testEvents";
+import { testFillables as _testFillables } from "./testFillables";
+import type { testFillablesAttributes, testFillablesCreationAttributes } from "./testFillables";
 import { testGroups as _testGroups } from "./testGroups";
 import type { testGroupsAttributes, testGroupsCreationAttributes } from "./testGroups";
-import { testVariantFillables as _testVariantFillables } from "./testVariantFillables";
-import type { testVariantFillablesAttributes, testVariantFillablesCreationAttributes } from "./testVariantFillables";
-import { testVariants as _testVariants } from "./testVariants";
-import type { testVariantsAttributes, testVariantsCreationAttributes } from "./testVariants";
+import { testResultValues as _testResultValues } from "./testResultValues";
+import type { testResultValuesAttributes, testResultValuesCreationAttributes } from "./testResultValues";
+import { testResults as _testResults } from "./testResults";
+import type { testResultsAttributes, testResultsCreationAttributes } from "./testResults";
 import { tests as _tests } from "./tests";
 import type { testsAttributes, testsCreationAttributes } from "./tests";
 import { units as _units } from "./units";
 import type { unitsAttributes, unitsCreationAttributes } from "./units";
+import { unitGroups as _unitGroups } from "./unitGroups";
+import type { unitGroupsAttributes, unitGroupsCreationAttributes } from "./unitGroups";
 import { userEventAttendances as _userEventAttendances } from "./userEventAttendances";
 import type { userEventAttendancesAttributes, userEventAttendancesCreationAttributes } from "./userEventAttendances";
 import { users as _users } from "./users";
@@ -69,11 +77,15 @@ export {
   _teamUserRoles as teamUserRoles,
   _teamUsers as teamUsers,
   _teams as teams,
+  _testEventTests as testEventTests,
+  _testEvents as testEvents,
+  _testFillables as testFillables,
   _testGroups as testGroups,
-  _testVariantFillables as testVariantFillables,
-  _testVariants as testVariants,
+  _testResultValues as testResultValues,
+  _testResults as testResults,
   _tests as tests,
   _units as units,
+  _unitGroups as unitGroups,
   _userEventAttendances as userEventAttendances,
   _users as users,
 };
@@ -115,16 +127,24 @@ export type {
   teamUsersCreationAttributes,
   teamsAttributes,
   teamsCreationAttributes,
+  testEventTestsAttributes,
+  testEventTestsCreationAttributes,
+  testEventsAttributes,
+  testEventsCreationAttributes,
+  testFillablesAttributes,
+  testFillablesCreationAttributes,
   testGroupsAttributes,
   testGroupsCreationAttributes,
-  testVariantFillablesAttributes,
-  testVariantFillablesCreationAttributes,
-  testVariantsAttributes,
-  testVariantsCreationAttributes,
+  testResultValuesAttributes,
+  testResultValuesCreationAttributes,
+  testResultsAttributes,
+  testResultsCreationAttributes,
   testsAttributes,
   testsCreationAttributes,
   unitsAttributes,
   unitsCreationAttributes,
+  unitGroupsAttributes,
+  unitGroupsCreationAttributes,
   userEventAttendancesAttributes,
   userEventAttendancesCreationAttributes,
   usersAttributes,
@@ -150,11 +170,15 @@ export function initModels(sequelize: Sequelize) {
   const teamUserRoles = _teamUserRoles.initModel(sequelize);
   const teamUsers = _teamUsers.initModel(sequelize);
   const teams = _teams.initModel(sequelize);
+  const testEventTests = _testEventTests.initModel(sequelize);
+  const testEvents = _testEvents.initModel(sequelize);
+  const testFillables = _testFillables.initModel(sequelize);
   const testGroups = _testGroups.initModel(sequelize);
-  const testVariantFillables = _testVariantFillables.initModel(sequelize);
-  const testVariants = _testVariants.initModel(sequelize);
+  const testResultValues = _testResultValues.initModel(sequelize);
+  const testResults = _testResults.initModel(sequelize);
   const tests = _tests.initModel(sequelize);
   const units = _units.initModel(sequelize);
+  const unitGroups = _unitGroups.initModel(sequelize);
   const userEventAttendances = _userEventAttendances.initModel(sequelize);
   const users = _users.initModel(sequelize);
 
@@ -208,16 +232,34 @@ export function initModels(sequelize: Sequelize) {
   teams.hasMany(teamUserRoles, { foreignKey: "teamId"});
   teamUsers.belongsTo(teams, { foreignKey: "teamId"});
   teams.hasMany(teamUsers, { foreignKey: "teamId"});
+  testEvents.belongsTo(teams, { foreignKey: "teamId"});
+  teams.hasMany(testEvents, { foreignKey: "teamId"});
+  testResults.belongsTo(teams, { foreignKey: "teamId"});
+  teams.hasMany(testResults, { foreignKey: "teamId"});
   tests.belongsTo(teams, { foreignKey: "teamId"});
   teams.hasMany(tests, { foreignKey: "teamId"});
-  testVariantFillables.belongsTo(testVariants, { foreignKey: "testVariantId"});
-  testVariants.hasMany(testVariantFillables, { foreignKey: "testVariantId"});
-  testVariants.belongsTo(tests, { foreignKey: "testId"});
-  tests.hasMany(testVariants, { foreignKey: "testId"});
-  testVariantFillables.belongsTo(units, { foreignKey: "unitId"});
-  units.hasMany(testVariantFillables, { foreignKey: "unitId"});
+  testEventTests.belongsTo(testEvents, { foreignKey: "testEventId"});
+  testEvents.hasMany(testEventTests, { foreignKey: "testEventId"});
+  testResults.belongsTo(testEvents, { foreignKey: "testEventId"});
+  testEvents.hasMany(testResults, { foreignKey: "testEventId"});
+  testResultValues.belongsTo(testFillables, { foreignKey: "testFillableId"});
+  testFillables.hasMany(testResultValues, { foreignKey: "testFillableId"});
+  tests.belongsTo(testGroups, { foreignKey: "testGroupId"});
+  testGroups.hasMany(tests, { foreignKey: "testGroupId"});
+  testResultValues.belongsTo(testResults, { foreignKey: "testResultId"});
+  testResults.hasMany(testResultValues, { foreignKey: "testResultId"});
+  testEventTests.belongsTo(tests, { foreignKey: "testId"});
+  tests.hasMany(testEventTests, { foreignKey: "testId"});
+  testFillables.belongsTo(tests, { foreignKey: "testId"});
+  tests.hasMany(testFillables, { foreignKey: "testId"});
+  testResults.belongsTo(tests, { foreignKey: "testId"});
+  tests.hasMany(testResults, { foreignKey: "testId"});
+  testFillables.belongsTo(units, { foreignKey: "unitId"});
+  units.hasMany(testFillables, { foreignKey: "unitId"});
   units.belongsTo(units, { foreignKey: "baseUnitId"});
   units.hasMany(units, { foreignKey: "baseUnitId"});
+  units.belongsTo(unitGroups, { foreignKey: "unitGroupId"});
+  unitGroups.hasMany(units, { foreignKey: "unitGroupId"});
   calSubscriptions.belongsTo(users, { foreignKey: "userId"});
   users.hasMany(calSubscriptions, { foreignKey: "userId"});
   calSubscriptions.belongsTo(users, { foreignKey: "guardianOfId"});
@@ -244,14 +286,16 @@ export function initModels(sequelize: Sequelize) {
   users.hasMany(teamUserRoles, { foreignKey: "userId"});
   teamUsers.belongsTo(users, { foreignKey: "userId"});
   users.hasMany(teamUsers, { foreignKey: "userId"});
-  testVariants.belongsTo(users, { foreignKey: "createdById"});
-  users.hasMany(testVariants, { foreignKey: "createdById"});
+  testEvents.belongsTo(users, { foreignKey: "createdById"});
+  users.hasMany(testEvents, { foreignKey: "createdById"});
+  testResults.belongsTo(users, { foreignKey: "createdById"});
+  users.hasMany(testResults, { foreignKey: "createdById"});
+  testResults.belongsTo(users, { foreignKey: "userId"});
+  users.hasMany(testResults, { foreignKey: "userId"});
   tests.belongsTo(users, { foreignKey: "createdById"});
   users.hasMany(tests, { foreignKey: "createdById"});
   userEventAttendances.belongsTo(users, { foreignKey: "userId"});
   users.hasMany(userEventAttendances, { foreignKey: "userId"});
-  tests.belongsTo(testGroups, { foreignKey: "testGroupId", as: "testGroup"});
-  testGroups.hasMany(tests, { foreignKey: "testGroupId", as: "tests"});
 
   return {
     sequelizeMeta: sequelizeMeta,
@@ -272,11 +316,15 @@ export function initModels(sequelize: Sequelize) {
     teamUserRoles: teamUserRoles,
     teamUsers: teamUsers,
     teams: teams,
+    testEventTests: testEventTests,
+    testEvents: testEvents,
+    testFillables: testFillables,
     testGroups: testGroups,
-    testVariantFillables: testVariantFillables,
-    testVariants: testVariants,
+    testResultValues: testResultValues,
+    testResults: testResults,
     tests: tests,
     units: units,
+    unitGroups: unitGroups,
     userEventAttendances: userEventAttendances,
     users: users,
   };

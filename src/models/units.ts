@@ -1,16 +1,18 @@
 import * as Sequelize from 'sequelize';
 import { DataTypes, Model, Optional } from 'sequelize';
-import type { testVariantFillables, testVariantFillablesId } from './testVariantFillables';
+import type { testFillables, testFillablesId } from './testFillables';
+import type { unitGroups, unitGroupsId } from './unitGroups';
 
 export interface unitsAttributes {
   id: number;
   name: object;
   symbol: string;
   code: string;
-  unitGroup: 'amount' | 'distance' | 'time' | 'mass' | 'temperature' | 'area' | 'volume' | 'speed' | 'angle';
+  unitGroupId: number;
   baseUnitId?: number;
   factorToBase: number;
   offsetToBase?: number;
+  displayMode: string;
   isDefault: number;
   createdAt: Date;
   updatedAt: Date;
@@ -18,7 +20,7 @@ export interface unitsAttributes {
 
 export type unitsPk = "id";
 export type unitsId = units[unitsPk];
-export type unitsOptionalAttributes = "id" | "baseUnitId" | "factorToBase" | "offsetToBase" | "isDefault" | "createdAt" | "updatedAt";
+export type unitsOptionalAttributes = "id" | "baseUnitId" | "factorToBase" | "offsetToBase" | "displayMode" | "isDefault" | "createdAt" | "updatedAt";
 export type unitsCreationAttributes = Optional<unitsAttributes, unitsOptionalAttributes>;
 
 export class units extends Model<unitsAttributes, unitsCreationAttributes> implements unitsAttributes {
@@ -26,26 +28,32 @@ export class units extends Model<unitsAttributes, unitsCreationAttributes> imple
   name!: object;
   symbol!: string;
   code!: string;
-  unitGroup!: 'amount' | 'distance' | 'time' | 'mass' | 'temperature' | 'area' | 'volume' | 'speed' | 'angle';
+  unitGroupId!: number;
   baseUnitId?: number;
   factorToBase!: number;
   offsetToBase?: number;
+  displayMode!: string;
   isDefault!: number;
   createdAt!: Date;
   updatedAt!: Date;
 
-  // units hasMany testVariantFillables via unitId
-  testVariantFillables!: testVariantFillables[];
-  getTestVariantFillables!: Sequelize.HasManyGetAssociationsMixin<testVariantFillables>;
-  setTestVariantFillables!: Sequelize.HasManySetAssociationsMixin<testVariantFillables, testVariantFillablesId>;
-  addTestVariantFillable!: Sequelize.HasManyAddAssociationMixin<testVariantFillables, testVariantFillablesId>;
-  addTestVariantFillables!: Sequelize.HasManyAddAssociationsMixin<testVariantFillables, testVariantFillablesId>;
-  createTestVariantFillable!: Sequelize.HasManyCreateAssociationMixin<testVariantFillables>;
-  removeTestVariantFillable!: Sequelize.HasManyRemoveAssociationMixin<testVariantFillables, testVariantFillablesId>;
-  removeTestVariantFillables!: Sequelize.HasManyRemoveAssociationsMixin<testVariantFillables, testVariantFillablesId>;
-  hasTestVariantFillable!: Sequelize.HasManyHasAssociationMixin<testVariantFillables, testVariantFillablesId>;
-  hasTestVariantFillables!: Sequelize.HasManyHasAssociationsMixin<testVariantFillables, testVariantFillablesId>;
-  countTestVariantFillables!: Sequelize.HasManyCountAssociationsMixin;
+  // units belongsTo unitGroups via unitGroupId
+  unitGroup!: unitGroups;
+  getUnitGroup!: Sequelize.BelongsToGetAssociationMixin<unitGroups>;
+  setUnitGroup!: Sequelize.BelongsToSetAssociationMixin<unitGroups, unitGroupsId>;
+  createUnitGroup!: Sequelize.BelongsToCreateAssociationMixin<unitGroups>;
+  // units hasMany testFillables via unitId
+  testFillables!: testFillables[];
+  getTestFillables!: Sequelize.HasManyGetAssociationsMixin<testFillables>;
+  setTestFillables!: Sequelize.HasManySetAssociationsMixin<testFillables, testFillablesId>;
+  addTestFillable!: Sequelize.HasManyAddAssociationMixin<testFillables, testFillablesId>;
+  addTestFillables!: Sequelize.HasManyAddAssociationsMixin<testFillables, testFillablesId>;
+  createTestFillable!: Sequelize.HasManyCreateAssociationMixin<testFillables>;
+  removeTestFillable!: Sequelize.HasManyRemoveAssociationMixin<testFillables, testFillablesId>;
+  removeTestFillables!: Sequelize.HasManyRemoveAssociationsMixin<testFillables, testFillablesId>;
+  hasTestFillable!: Sequelize.HasManyHasAssociationMixin<testFillables, testFillablesId>;
+  hasTestFillables!: Sequelize.HasManyHasAssociationsMixin<testFillables, testFillablesId>;
+  countTestFillables!: Sequelize.HasManyCountAssociationsMixin;
   // units belongsTo units via baseUnitId
   baseUnit!: units;
   getBaseUnit!: Sequelize.BelongsToGetAssociationMixin<units>;
@@ -73,10 +81,14 @@ export class units extends Model<unitsAttributes, unitsCreationAttributes> imple
       allowNull: false,
       unique: "code"
     },
-    unitGroup: {
-      type: DataTypes.ENUM('amount','distance','time','mass','temperature','area','volume','speed','angle'),
+    unitGroupId: {
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
-      field: 'unit_group'
+      references: {
+        model: 'unit_groups',
+        key: 'id'
+      },
+      field: 'unit_group_id'
     },
     baseUnitId: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -98,6 +110,12 @@ export class units extends Model<unitsAttributes, unitsCreationAttributes> imple
       allowNull: true,
       defaultValue: 0.000000000000000,
       field: 'offset_to_base'
+    },
+    displayMode: {
+      type: DataTypes.STRING(32),
+      allowNull: false,
+      defaultValue: "decimal",
+      field: 'display_mode'
     },
     isDefault: {
       type: DataTypes.BOOLEAN,
@@ -141,6 +159,13 @@ export class units extends Model<unitsAttributes, unitsCreationAttributes> imple
         using: "BTREE",
         fields: [
           { name: "base_unit_id" },
+        ]
+      },
+      {
+        name: "fk_units_group",
+        using: "BTREE",
+        fields: [
+          { name: "unit_group_id" },
         ]
       },
     ]

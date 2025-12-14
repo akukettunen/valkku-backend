@@ -1,33 +1,37 @@
 import * as Sequelize from 'sequelize';
 import { DataTypes, Model, Optional } from 'sequelize';
+import type { tests, testsId } from './tests';
 
 export interface testGroupsAttributes {
   id: number;
   title: object;
+  sort_order: number;
+  deletedAt?: Date;
 }
 
 export type testGroupsPk = "id";
 export type testGroupsId = testGroups[testGroupsPk];
-export type testGroupsOptionalAttributes = "id";
+export type testGroupsOptionalAttributes = "id" | "sort_order" | "deletedAt";
 export type testGroupsCreationAttributes = Optional<testGroupsAttributes, testGroupsOptionalAttributes>;
 
 export class testGroups extends Model<testGroupsAttributes, testGroupsCreationAttributes> implements testGroupsAttributes {
   id!: number;
   title!: object;
+  sort_order!: number;
+  deletedAt?: Date;
 
   // testGroups hasMany tests via testGroupId
-  tests!: import('./tests').tests[];
-  getTests!: Sequelize.HasManyGetAssociationsMixin<import('./tests').tests>;
-  setTests!: Sequelize.HasManySetAssociationsMixin<import('./tests').tests, import('./tests').testsId>;
-  addTest!: Sequelize.HasManyAddAssociationMixin<import('./tests').tests, import('./tests').testsId>;
-  addTests!: Sequelize.HasManyAddAssociationsMixin<import('./tests').tests, import('./tests').testsId>;
-  createTest!: Sequelize.HasManyCreateAssociationMixin<import('./tests').tests>;
-  removeTest!: Sequelize.HasManyRemoveAssociationMixin<import('./tests').tests, import('./tests').testsId>;
-  removeTests!: Sequelize.HasManyRemoveAssociationsMixin<import('./tests').tests, import('./tests').testsId>;
-  hasTest!: Sequelize.HasManyHasAssociationMixin<import('./tests').tests, import('./tests').testsId>;
-  hasTests!: Sequelize.HasManyHasAssociationsMixin<import('./tests').tests, import('./tests').testsId>;
+  tests!: tests[];
+  getTests!: Sequelize.HasManyGetAssociationsMixin<tests>;
+  setTests!: Sequelize.HasManySetAssociationsMixin<tests, testsId>;
+  addTest!: Sequelize.HasManyAddAssociationMixin<tests, testsId>;
+  addTests!: Sequelize.HasManyAddAssociationsMixin<tests, testsId>;
+  createTest!: Sequelize.HasManyCreateAssociationMixin<tests>;
+  removeTest!: Sequelize.HasManyRemoveAssociationMixin<tests, testsId>;
+  removeTests!: Sequelize.HasManyRemoveAssociationsMixin<tests, testsId>;
+  hasTest!: Sequelize.HasManyHasAssociationMixin<tests, testsId>;
+  hasTests!: Sequelize.HasManyHasAssociationsMixin<tests, testsId>;
   countTests!: Sequelize.HasManyCountAssociationsMixin;
-
 
   static initModel(sequelize: Sequelize.Sequelize): typeof testGroups {
     return testGroups.init({
@@ -40,6 +44,16 @@ export class testGroups extends Model<testGroupsAttributes, testGroupsCreationAt
     title: {
       type: DataTypes.JSON,
       allowNull: false
+    },
+    sort_order: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
+    deletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'deleted_at'
     }
   }, {
     sequelize,

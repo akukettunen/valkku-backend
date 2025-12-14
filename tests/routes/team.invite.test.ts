@@ -3,10 +3,18 @@ import request from 'supertest'
 import app from '@/app'
 
 // Bypass auth middleware for these route tests
-vi.mock('@/middleware/auth', () => ({
-  requireSignedIn: (_req: any, _res: any, next: any) => { _req.user = { sub: 'inviter123' }; next() },
-  requireScope: () => (_req: any, _res: any, next: any) => next(),
-}))
+vi.mock('@/middleware/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/middleware/auth')>()
+  return {
+    ...actual,
+    requireSignedIn: (_req: any, _res: any, next: any) => {
+      _req.user = { sub: 'inviter123' }
+      next()
+    },
+    requireScope: () => (_req: any, _res: any, next: any) => next(),
+    validateBasedOnScope: () => (_req: any, _res: any, next: any) => next()
+  }
+})
 
 // Mock DB: team
 vi.mock('@/db/team', () => ({
@@ -22,6 +30,7 @@ vi.mock('@/db/team', () => ({
 // Mock DB: user
 vi.mock('@/db/user', () => ({
   getUserByEmail: vi.fn(),
+  getUserById: vi.fn(),
   createUser: vi.fn(),
 }))
 
@@ -38,7 +47,7 @@ vi.mock('@/utils/emailHelper', () => ({
 
 import { getTeamById, getTeamUser, getTeamUserRoles, createTeamUser, createTeamUserRole } from '@/db/team'
 import { sendTeamAddedEmail } from '@/utils/emailHelper'
-import { getUserByEmail, createUser } from '@/db/user'
+import { getUserByEmail, getUserById, createUser } from '@/db/user'
 import { userCanBeInvited, inviteUserToTeamAndSendEmail } from '@/utils/teamHelper'
 
 const TEAM_ID = 'team123'
@@ -47,6 +56,7 @@ describe('POST /api/team/:teamId/invite', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getTeamById).mockResolvedValue([{ id: TEAM_ID, name: 'Team' }] as any)
+    vi.mocked(getUserById).mockResolvedValue([{ id: 'u1', email: 'exists@example.com', firstName: 'User', preferredLanguage: 'en' }] as any)
   })
 
   const url = (teamId = TEAM_ID) => `/api/team/${teamId}/invite`
@@ -71,11 +81,11 @@ describe('POST /api/team/:teamId/invite', () => {
     // createUser called once with provided email
     expect(createUser).toHaveBeenCalledTimes(1)
     const createdId = vi.mocked(createUser).mock.calls[0][0].id
-    expect(vi.mocked(inviteUserToTeamAndSendEmail)).toHaveBeenCalledWith(createdId, TEAM_ID, 'inviter123')
+    expect(vi.mocked(inviteUserToTeamAndSendEmail)).toHaveBeenCalledWith(createdId, TEAM_ID, 'inviter123', 'athlete')
     expect(vi.mocked(createTeamUserRole)).toHaveBeenCalledWith(TEAM_ID, createdId, 'athlete', undefined)
   })
 
-  it('invites an existing non-guardian user not in team: no createUser, invite + role', async () => {
+  it('adds an existing non-guardian user not in team: no createUser, no invite, adds membership + role', async () => {
     vi.mocked(userCanBeInvited).mockResolvedValue({
       canBeInvited: true,
       userToBeCreated: false,
@@ -89,7 +99,9 @@ describe('POST /api/team/:teamId/invite', () => {
 
     expect(res.status).toBe(201)
     expect(createUser).not.toHaveBeenCalled()
-    expect(inviteUserToTeamAndSendEmail).toHaveBeenCalledWith('u1', TEAM_ID, 'inviter123')
+    expect(inviteUserToTeamAndSendEmail).not.toHaveBeenCalled()
+    expect(sendTeamAddedEmail).toHaveBeenCalledWith('exists@example.com', 'Team', 'coach', 'User', 'en')
+    expect(createTeamUser).toHaveBeenCalledWith(TEAM_ID, 'u1', 'active')
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, 'u1', 'coach', undefined)
   })
 
@@ -106,7 +118,7 @@ describe('POST /api/team/:teamId/invite', () => {
       .send({ email: 'exists@example.com', role: 'coach', guardians: [], preferredLanguage: 'en' })
 
     expect(res.status).toBe(400)
-    expect(res.body.code).toBe('user_already_invited_to_team_with_role')
+    expect(res.body.code).toBe('user_already_invited_to_team')
     expect(createUser).not.toHaveBeenCalled()
     expect(inviteUserToTeamAndSendEmail).not.toHaveBeenCalled()
     expect(createTeamUserRole).not.toHaveBeenCalled()
@@ -119,6 +131,9 @@ describe('POST /api/team/:teamId/invite', () => {
       userTeamToBeCreated: false,
       publicUser: { id: 'g1' },
     } as any)
+    vi.mocked(getUserById).mockResolvedValueOnce([
+      { id: 'g1', email: 'guardian@example.com', firstName: 'Guardian', preferredLanguage: 'en' },
+    ] as any)
     // Not yet in team
     vi.mocked(getTeamUser).mockResolvedValueOnce([] as any)
     // No duplicate guardian role yet
@@ -129,7 +144,7 @@ describe('POST /api/team/:teamId/invite', () => {
       .send({ email: 'guardian@example.com', role: 'guardian', guardianOf: 'ath1', guardians: [], preferredLanguage: 'en' })
 
     expect(res.status).toBe(201)
-    expect(createTeamUser).toHaveBeenCalledWith(TEAM_ID, 'g1')
+    expect(createTeamUser).toHaveBeenCalledWith(TEAM_ID, 'g1', 'active')
     expect(sendTeamAddedEmail).toHaveBeenCalledWith('guardian@example.com', 'Team', 'guardian', 'Guardian', 'en')
     expect(inviteUserToTeamAndSendEmail).not.toHaveBeenCalled()
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, 'g1', 'guardian', 'ath1')
@@ -213,7 +228,7 @@ describe('POST /api/team/:teamId/invite', () => {
     // g2 (new): create + invite + role
     const createdG2Id = vi.mocked(createUser).mock.calls.find(([args]) => args.email === 'g2@example.com')?.[0]?.id
     expect(createdG2Id).toBeTruthy()
-    expect(inviteUserToTeamAndSendEmail).toHaveBeenCalledWith(createdG2Id, TEAM_ID, 'inviter123')
+    expect(inviteUserToTeamAndSendEmail).toHaveBeenCalledWith(createdG2Id, TEAM_ID, 'inviter123', 'guardian')
     expect(createTeamUserRole).toHaveBeenCalledWith(TEAM_ID, createdG2Id, 'guardian', 'ath1')
   })
 

@@ -9,6 +9,8 @@ import type { planParts, planPartsId } from './planParts';
 import type { plans, plansId } from './plans';
 import type { teamUserRoles, teamUserRolesId } from './teamUserRoles';
 import type { teamUsers, teamUsersId } from './teamUsers';
+import type { testEvents, testEventsId } from './testEvents';
+import type { testResults, testResultsId } from './testResults';
 import type { tests, testsId } from './tests';
 import type { users, usersId } from './users';
 
@@ -138,6 +140,30 @@ export class teams extends Model<teamsAttributes, teamsCreationAttributes> imple
   hasTeamUser!: Sequelize.HasManyHasAssociationMixin<teamUsers, teamUsersId>;
   hasTeamUsers!: Sequelize.HasManyHasAssociationsMixin<teamUsers, teamUsersId>;
   countTeamUsers!: Sequelize.HasManyCountAssociationsMixin;
+  // teams hasMany testEvents via teamId
+  testEvents!: testEvents[];
+  getTestEvents!: Sequelize.HasManyGetAssociationsMixin<testEvents>;
+  setTestEvents!: Sequelize.HasManySetAssociationsMixin<testEvents, testEventsId>;
+  addTestEvent!: Sequelize.HasManyAddAssociationMixin<testEvents, testEventsId>;
+  addTestEvents!: Sequelize.HasManyAddAssociationsMixin<testEvents, testEventsId>;
+  createTestEvent!: Sequelize.HasManyCreateAssociationMixin<testEvents>;
+  removeTestEvent!: Sequelize.HasManyRemoveAssociationMixin<testEvents, testEventsId>;
+  removeTestEvents!: Sequelize.HasManyRemoveAssociationsMixin<testEvents, testEventsId>;
+  hasTestEvent!: Sequelize.HasManyHasAssociationMixin<testEvents, testEventsId>;
+  hasTestEvents!: Sequelize.HasManyHasAssociationsMixin<testEvents, testEventsId>;
+  countTestEvents!: Sequelize.HasManyCountAssociationsMixin;
+  // teams hasMany testResults via teamId
+  testResults!: testResults[];
+  getTestResults!: Sequelize.HasManyGetAssociationsMixin<testResults>;
+  setTestResults!: Sequelize.HasManySetAssociationsMixin<testResults, testResultsId>;
+  addTestResult!: Sequelize.HasManyAddAssociationMixin<testResults, testResultsId>;
+  addTestResults!: Sequelize.HasManyAddAssociationsMixin<testResults, testResultsId>;
+  createTestResult!: Sequelize.HasManyCreateAssociationMixin<testResults>;
+  removeTestResult!: Sequelize.HasManyRemoveAssociationMixin<testResults, testResultsId>;
+  removeTestResults!: Sequelize.HasManyRemoveAssociationsMixin<testResults, testResultsId>;
+  hasTestResult!: Sequelize.HasManyHasAssociationMixin<testResults, testResultsId>;
+  hasTestResults!: Sequelize.HasManyHasAssociationsMixin<testResults, testResultsId>;
+  countTestResults!: Sequelize.HasManyCountAssociationsMixin;
   // teams hasMany tests via teamId
   tests!: tests[];
   getTests!: Sequelize.HasManyGetAssociationsMixin<tests>;

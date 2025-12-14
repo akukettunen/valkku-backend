@@ -68,6 +68,21 @@ export default {
     "event:attendance:read": ["owner", "admin", "coach", "athlete", "guardian"],
     "event:attendance:delete": ["owner", "admin", "coach"],
     "event:attendance:update": ["owner", "admin", "coach"],
+
+    "test:create": ["owner", "admin", "coach", "athlete", "guardian"],
+    "test:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "test:update": ["owner", "admin", "coach", "athlete", "guardian"],
+    "test:delete": ["owner", "admin", "coach", "athlete", "guardian"],
+
+    "test-event:create": ["owner", "admin", "coach"],
+    "test-event:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "test-event:update": ["owner", "admin", "coach"],
+    "test-event:delete": ["owner", "admin", "coach"],
+
+    "test-result:create": ["owner", "admin", "coach"],
+    "test-result:read": ["owner", "admin", "coach", "athlete", "guardian"],
+    "test-result:update": ["owner", "admin", "coach"],
+    "test-result:delete": ["owner", "admin", "coach"],
   },
   "individual": { // actions regarding ones own stuff
     "event:create": [ "self", "guardian-as-athlete"], // create event for self or guarded athlete
@@ -94,5 +109,10 @@ export default {
     "plan-part:delete": ["self", "guardian-as-athlete"],
 
     "user:read": ["self", "guardian-as-athlete"],
+
+    "test-result:create": ["self", "guardian-as-athlete"],
+    "test-result:read": ["self", "guardian-as-athlete"],
+    "test-result:update": ["self", "guardian-as-athlete"],
+    "test-result:delete": ["self", "guardian-as-athlete"],
   }
 } as const;

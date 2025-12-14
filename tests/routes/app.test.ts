@@ -26,7 +26,7 @@ describe("app.ts routes", () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      message: "Welcome to Valkku Backend! 🚀",
+      message: "Welcome to Valkku Backend API! 🚀",
       timestamp: expect.any(String),
       environment: expect.any(String)
     });

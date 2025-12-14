@@ -1,11 +1,16 @@
 import { Router, Request, Response } from 'express';
-import { query } from '@/db/index';
+import { models } from '@/db/index';
 import { requireSignedIn } from '@/middleware/auth';
 
 const router: Router = Router();
 
 router.get('/', requireSignedIn, async (req: Request, res: Response) => {
-  const units = await query('SELECT * FROM units');
+  const units = await models.units.findAll({
+      include: [{
+          model: models.unitGroups,
+          as: 'unitGroup'
+      }]
+  });
 
   return res.status(200).json({
     success: true,
