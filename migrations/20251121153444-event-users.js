@@ -22,15 +22,15 @@ module.exports = {
     `);
 
     await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN forAllAthletes BOOLEAN NOT NULL DEFAULT 1;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS forAllAthletes BOOLEAN NOT NULL DEFAULT 1;
     `);
 
     await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN forAllStaff BOOLEAN NOT NULL DEFAULT 1;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS forAllStaff BOOLEAN NOT NULL DEFAULT 1;
     `);
 
     await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN registrationRequired BOOLEAN NOT NULL DEFAULT 1;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS registrationRequired BOOLEAN NOT NULL DEFAULT 1;
     `);
   },
 
