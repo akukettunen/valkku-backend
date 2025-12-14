@@ -21,17 +21,44 @@ module.exports = {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 
-    await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN IF NOT EXISTS forAllAthletes BOOLEAN NOT NULL DEFAULT 1;
+    // Add forAllAthletes column if it doesn't exist
+    const [columnsForAllAthletes] = await queryInterface.sequelize.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'events'
+      AND COLUMN_NAME = 'forAllAthletes';
     `);
+    if (columnsForAllAthletes.length === 0) {
+      await queryInterface.sequelize.query(`
+        ALTER TABLE events ADD COLUMN forAllAthletes BOOLEAN NOT NULL DEFAULT 1;
+      `);
+    }
 
-    await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN IF NOT EXISTS forAllStaff BOOLEAN NOT NULL DEFAULT 1;
+    // Add forAllStaff column if it doesn't exist
+    const [columnsForAllStaff] = await queryInterface.sequelize.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'events'
+      AND COLUMN_NAME = 'forAllStaff';
     `);
+    if (columnsForAllStaff.length === 0) {
+      await queryInterface.sequelize.query(`
+        ALTER TABLE events ADD COLUMN forAllStaff BOOLEAN NOT NULL DEFAULT 1;
+      `);
+    }
 
-    await queryInterface.sequelize.query(`
-      ALTER TABLE events ADD COLUMN IF NOT EXISTS registrationRequired BOOLEAN NOT NULL DEFAULT 1;
+    // Add registrationRequired column if it doesn't exist
+    const [columnsRegistrationRequired] = await queryInterface.sequelize.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'events'
+      AND COLUMN_NAME = 'registrationRequired';
     `);
+    if (columnsRegistrationRequired.length === 0) {
+      await queryInterface.sequelize.query(`
+        ALTER TABLE events ADD COLUMN registrationRequired BOOLEAN NOT NULL DEFAULT 1;
+      `);
+    }
   },
 
   async down (queryInterface, Sequelize) {
