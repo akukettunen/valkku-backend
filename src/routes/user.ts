@@ -103,4 +103,41 @@ router.get(`/team/:teamId/athlete`, requireSignedIn, requireScope('user:read', '
   });
 });
 
+router.post('/request-deletion', requireSignedIn, async (req: Request, res: Response) => {
+  const [ user ] = await getUserById(req.user?.sub!) as User[];
+  if (!user) {
+    throw new AppError('User not found', 404, 'user_not_found');
+  }
+
+  const { sendEmail } = await import('@/utils/emailHelper');
+
+  const subject = 'Account Deletion Request - Valkku';
+  const textBody = `
+Account Deletion Request
+
+User Information:
+- Name: ${user.fullName || `${user.firstName} ${user.lastName}`}
+- Email: ${user.email}
+- User ID: ${user.id}
+- Auth0 Subject: ${user.sub}
+
+This user has requested account deletion from the Valkku platform.
+
+Time: ${new Date().toISOString()}
+  `.trim();
+
+  await sendEmail({
+    to: 'aku@kettunen.com',
+    subject,
+    textBody,
+    replyTo: user.email
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: 'Account deletion request sent',
+    code: 'deletion_request_sent'
+  });
+});
+
 export default router;
