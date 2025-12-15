@@ -8,6 +8,7 @@ import { AppError } from '@/middleware/errors';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { generateAccessToken } from '@/utils/tokenHelper';
 import { query } from '@/db/index';
+import { sendEmail } from '@/utils/emailHelper';
 
 const router: Router = Router();
 
@@ -109,8 +110,6 @@ router.post('/request-deletion', requireSignedIn, async (req: Request, res: Resp
     throw new AppError('User not found', 404, 'user_not_found');
   }
 
-  const { sendEmail } = await import('@/utils/emailHelper');
-
   const subject = 'Account Deletion Request - Valkku';
   const textBody = `
 Account Deletion Request
@@ -119,7 +118,6 @@ User Information:
 - Name: ${user.fullName || `${user.firstName} ${user.lastName}`}
 - Email: ${user.email}
 - User ID: ${user.id}
-- Auth0 Subject: ${user.sub}
 
 This user has requested account deletion from the Valkku platform.
 
