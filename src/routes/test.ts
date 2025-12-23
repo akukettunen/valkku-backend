@@ -485,12 +485,16 @@ router.post('/results', requireSignedIn, async (req: Request, res: Response) => 
 
       if (!userId || !values) continue;
 
-      let result;
+      const tryOrder = entry.tryOrder || 1;
+      const now = new Date();
 
-      // Check if we should update an existing result for this event
-      if (testEventId) {
-          const tryOrder = entry.tryOrder || 1;
-          const existingResult = await models.testResults.findOne({
+      // Only do special merge logic for event results
+      const isEvent = !!testEventId;
+      let result: any = null;
+
+      if (isEvent) {
+          // If duplicates exist, keep newest active one and soft-delete older ones + their values
+          const existingResults = await models.testResults.findAll({
               where: {
                   testId,
                   testEventId,
@@ -498,34 +502,122 @@ router.post('/results', requireSignedIn, async (req: Request, res: Response) => 
                   tryOrder,
                   deletedAt: null
               },
+              order: [['id', 'DESC']],
               transaction: t
           });
 
-          if (existingResult) {
-              result = existingResult;
-              // Update date if changed? Maybe keep original? Let's update it to current submission.
-              await result.update({ date }, { transaction: t });
-
-              // Delete existing values to replace them (Soft delete)
-              const existingResultId = result.id || result.dataValues?.id;
-              if (existingResultId) {
-                  await models.testResultValues.update({ deletedAt: new Date() }, { where: { testResultId: existingResultId, deletedAt: null }, transaction: t });
+          if (existingResults.length > 0) {
+              result = existingResults[0];
+              const extra = existingResults.slice(1);
+              if (extra.length > 0) {
+                  const extraIds = extra.map(r => r.getDataValue('id') || (r as any).id).filter(Boolean);
+                  if (extraIds.length > 0) {
+                      await models.testResultValues.update(
+                          { deletedAt: now },
+                          { where: { testResultId: { [Op.in]: extraIds }, deletedAt: null }, transaction: t }
+                      );
+                      await models.testResults.update(
+                          { deletedAt: now },
+                          { where: { id: { [Op.in]: extraIds }, deletedAt: null }, transaction: t }
+                      );
+                  }
               }
           }
+
+          // If no active result exists yet, create one only if there's at least one numeric value
+          const hasAnyRealValue = Array.isArray(values) && values.some(v => v && v.value !== null && v.value !== undefined && v.value !== '');
+          if (!result) {
+              if (!hasAnyRealValue) {
+                  continue;
+              }
+              const resultData: testResultsCreationAttributes = {
+                  userId,
+                  testId,
+                  testEventId: testEventId || null,
+                  date,
+                  createdById,
+                  teamId: teamId || null,
+                  tryOrder
+              };
+              result = await models.testResults.create(resultData, { transaction: t });
+          } else {
+              await result.update({ date }, { transaction: t });
+          }
+
+          const resultId = result.getDataValue('id') || result.id || (result as any).dataValues?.id;
+          if (!resultId) continue;
+
+          // Upsert per fillable:
+          // - value === null means "delete this fillable value" (soft delete)
+          // - numeric value means "upsert/update"
+          for (const v of values) {
+              const fillableId = v?.testFillableId ?? v?.fillableId;
+              if (fillableId === undefined) continue;
+
+              const incoming = v?.value;
+
+              if (incoming === null) {
+                  await models.testResultValues.update(
+                      { deletedAt: now },
+                      { where: { testResultId: resultId, testFillableId: fillableId, deletedAt: null }, transaction: t }
+                  );
+                  continue;
+              }
+
+              if (incoming === undefined || incoming === '') {
+                  // Missing/invalid -> don't touch existing value
+                  continue;
+              }
+
+              const existingValue = await models.testResultValues.findOne({
+                  where: { testResultId: resultId, testFillableId: fillableId, deletedAt: null },
+                  transaction: t
+              });
+
+              if (existingValue) {
+                  await existingValue.update({ value: incoming }, { transaction: t });
+              } else {
+                  const valueData: testResultValuesCreationAttributes = {
+                      testResultId: resultId,
+                      testFillableId: fillableId,
+                      value: incoming
+                  };
+                  await models.testResultValues.create(valueData, { transaction: t });
+              }
+          }
+
+          // If after deletes we have no active values left, soft-delete the result row too
+          const remaining = await models.testResultValues.count({
+              where: { testResultId: resultId, deletedAt: null },
+              transaction: t
+          });
+          if (remaining === 0) {
+              await models.testResults.update(
+                  { deletedAt: now },
+                  { where: { id: resultId, deletedAt: null }, transaction: t }
+              );
+          }
+
+          output.push(result);
+          continue;
       }
 
-      if (!result) {
-          const resultData: testResultsCreationAttributes = {
-            userId,
-            testId,
-            testEventId: testEventId || null,
-            date,
-            createdById,
-            teamId: teamId || null,
-            tryOrder: entry.tryOrder || 1
-          };
-          result = await models.testResults.create(resultData, { transaction: t });
+      // Non-event (individual) fallback: keep existing behavior (create new values, etc.)
+
+      if (!values || values.length === 0) {
+          continue;
       }
+
+      const resultData: testResultsCreationAttributes = {
+          userId,
+          testId,
+          testEventId: null,
+          date,
+          createdById,
+          teamId: teamId || null,
+          tryOrder: entry.tryOrder || 1
+      };
+      result = await models.testResults.create(resultData, { transaction: t });
 
       // Use a safe ID accessor
       const resultId = result.id || result.dataValues?.id;
@@ -822,7 +914,7 @@ router.put('/events/:id', requireSignedIn, requireScope('test-event:update', 'te
     return res.status(200).json({ success: true, data });
 });
 
-// DELETE /test/events/:id - Delete test event
+// DELETE /test/events/:id - Delete test event (and associated results/values)
 router.delete('/events/:id', requireSignedIn, requireScope('test-event:delete', 'team'), async (req: Request, res: Response) => {
     const id = req.params['id'];
     if (!id) throw new AppError('Invalid ID', 400, 'validation_error');
@@ -833,19 +925,45 @@ router.delete('/events/:id', requireSignedIn, requireScope('test-event:delete', 
     if (!event) throw new AppError('Event not found', 404, 'not_found');
 
     const now = new Date();
+    const transaction = await sequelize.transaction();
 
-    // Manual cleanup (Soft delete)
-    await models.testEventTests.update({ deletedAt: now }, { where: { testEventId: eventId, deletedAt: null } });
+    try {
+        // Soft delete links to tests
+        await models.testEventTests.update(
+            { deletedAt: now },
+            { where: { testEventId: eventId, deletedAt: null }, transaction }
+        );
 
-    // Delete results associated with this event (and their values)
-    const results = await models.testResults.findAll({ where: { testEventId: eventId, deletedAt: null } });
-    if (results.length > 0) {
-        const resultIds = results.map(r => r.id);
-        await models.testResultValues.update({ deletedAt: now }, { where: { testResultId: resultIds, deletedAt: null } });
-        await models.testResults.update({ deletedAt: now }, { where: { id: resultIds, deletedAt: null } });
+        // Soft delete results and their values tied to this event
+        const existingResults = await models.testResults.findAll({
+            where: { testEventId: eventId, deletedAt: null },
+            transaction
+        });
+
+        if (existingResults.length > 0) {
+            const resultIds = existingResults.map(r => r.getDataValue('id') || (r as any).id).filter(Boolean);
+
+            if (resultIds.length > 0) {
+                await models.testResultValues.update(
+                    { deletedAt: now },
+                    { where: { testResultId: { [Op.in]: resultIds }, deletedAt: null }, transaction }
+                );
+            }
+
+            await models.testResults.update(
+                { deletedAt: now },
+                { where: { id: { [Op.in]: resultIds }, deletedAt: null }, transaction }
+            );
+        }
+
+        // Soft delete the event
+        await event.update({ deletedAt: now }, { transaction });
+
+        await transaction.commit();
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
     }
-
-    await event.update({ deletedAt: now });
 
     return res.status(200).json({ success: true });
 });
