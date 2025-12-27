@@ -14,6 +14,7 @@ export interface eventsAttributes {
   type: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event' | 'mental';
   status: 'draft' | 'published' | 'archived';
   createdById?: string;
+  athleteId?: string;
   notes?: string;
   ownNotes?: string;
   coachesNotes?: string;
@@ -38,7 +39,7 @@ export interface eventsAttributes {
 
 export type eventsPk = "id";
 export type eventsId = events[eventsPk];
-export type eventsOptionalAttributes = "id" | "status" | "createdById" | "notes" | "ownNotes" | "coachesNotes" | "startTimeUnixSec" | "endTimeUnixSec" | "durationInMinutes" | "repeats" | "repeatsOn" | "repeatsUntilUnixSec" | "planId" | "locationId" | "createdAt" | "updatedAt" | "timezone" | "baseEventId" | "registrationRequired" | "forAllAthletes" | "forAllUsers" | "forAllStaff";
+export type eventsOptionalAttributes = "id" | "status" | "createdById" | "athleteId" | "notes" | "ownNotes" | "coachesNotes" | "startTimeUnixSec" | "endTimeUnixSec" | "durationInMinutes" | "repeats" | "repeatsOn" | "repeatsUntilUnixSec" | "planId" | "locationId" | "createdAt" | "updatedAt" | "timezone" | "baseEventId" | "registrationRequired" | "forAllAthletes" | "forAllUsers" | "forAllStaff";
 export type eventsCreationAttributes = Optional<eventsAttributes, eventsOptionalAttributes>;
 
 export class events extends Model<eventsAttributes, eventsCreationAttributes> implements eventsAttributes {
@@ -48,6 +49,7 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
   type!: 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event' | 'mental';
   status!: 'draft' | 'published' | 'archived';
   createdById?: string;
+  athleteId?: string;
   notes?: string;
   ownNotes?: string;
   coachesNotes?: string;
@@ -125,6 +127,11 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
   getTeam!: Sequelize.BelongsToGetAssociationMixin<teams>;
   setTeam!: Sequelize.BelongsToSetAssociationMixin<teams, teamsId>;
   createTeam!: Sequelize.BelongsToCreateAssociationMixin<teams>;
+  // events belongsTo users via athleteId
+  athlete!: users;
+  getAthlete!: Sequelize.BelongsToGetAssociationMixin<users>;
+  setAthlete!: Sequelize.BelongsToSetAssociationMixin<users, usersId>;
+  createAthlete!: Sequelize.BelongsToCreateAssociationMixin<users>;
   // events belongsTo users via createdById
   createdBy!: users;
   getCreatedBy!: Sequelize.BelongsToGetAssociationMixin<users>;
@@ -161,6 +168,14 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
       defaultValue: "published"
     },
     createdById: {
+      type: DataTypes.STRING(21),
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    athleteId: {
       type: DataTypes.STRING(21),
       allowNull: true,
       references: {
@@ -313,6 +328,13 @@ export class events extends Model<eventsAttributes, eventsCreationAttributes> im
         using: "BTREE",
         fields: [
           { name: "baseEventId" },
+        ]
+      },
+      {
+        name: "events_athleteId_idx",
+        using: "BTREE",
+        fields: [
+          { name: "athleteId" },
         ]
       },
     ]

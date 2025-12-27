@@ -9,9 +9,9 @@ export interface testEventsAttributes {
   id: number;
   teamId: string;
   date: string;
-  name?: object | null;
+  name?: object;
   createdById: string;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,9 +25,9 @@ export class testEvents extends Model<testEventsAttributes, testEventsCreationAt
   id!: number;
   teamId!: string;
   date!: string;
-  name?: object | null;
+  name?: object;
   createdById!: string;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -144,6 +144,3 @@ export class testEvents extends Model<testEventsAttributes, testEventsCreationAt
   });
   }
 }
-
-
-

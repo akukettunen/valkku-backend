@@ -319,6 +319,11 @@ export const filterEventsByUserAccess = (events: Event[], userId: string, isAthl
       return true;
     }
 
+    // Allow if event is explicitly owned by the athlete
+    if (event.athleteId && event.athleteId === userId) {
+      return true;
+    }
+
     // Allow based on role
     if (isAthlete) {
       if (event.forAllAthletes === 1 || event.forAllAthletes === true) {
@@ -389,6 +394,12 @@ export const getFilteredTeamEvents = async (
       as: 'location'
     },
     {
+      model: models.users,
+      as: 'athlete',
+      attributes: ['id', 'firstName', 'lastName', 'email', 'fullName'],
+      required: false
+    },
+    {
       model: models.eventUsers,
       as: 'eventUsers',
       required: false,
@@ -410,14 +421,21 @@ export const getFilteredTeamEvents = async (
     });
   }
 
-  // Fetch events
   const eventRows = await models.events.findAll({
     where,
     order: [['eventDate', 'ASC'], ['startTimeUnixSec', 'ASC']],
     include
   });
 
-  let events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+  const events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+
+  // Attach athlete name/email for convenience
+  for (const ev of events as any[]) {
+    if (ev.athlete) {
+      ev.athleteName = ev.athlete.fullName || [ev.athlete.firstName, ev.athlete.lastName].filter(Boolean).join(' ').trim();
+      ev.athleteEmail = ev.athlete.email;
+    }
+  }
 
   // Staff see all events, athletes/guardians get filtered
   if (!isStaff) {

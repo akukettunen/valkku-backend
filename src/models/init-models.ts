@@ -49,10 +49,10 @@ import { testResults as _testResults } from "./testResults";
 import type { testResultsAttributes, testResultsCreationAttributes } from "./testResults";
 import { tests as _tests } from "./tests";
 import type { testsAttributes, testsCreationAttributes } from "./tests";
-import { units as _units } from "./units";
-import type { unitsAttributes, unitsCreationAttributes } from "./units";
 import { unitGroups as _unitGroups } from "./unitGroups";
 import type { unitGroupsAttributes, unitGroupsCreationAttributes } from "./unitGroups";
+import { units as _units } from "./units";
+import type { unitsAttributes, unitsCreationAttributes } from "./units";
 import { userEventAttendances as _userEventAttendances } from "./userEventAttendances";
 import type { userEventAttendancesAttributes, userEventAttendancesCreationAttributes } from "./userEventAttendances";
 import { users as _users } from "./users";
@@ -84,8 +84,8 @@ export {
   _testResultValues as testResultValues,
   _testResults as testResults,
   _tests as tests,
-  _units as units,
   _unitGroups as unitGroups,
+  _units as units,
   _userEventAttendances as userEventAttendances,
   _users as users,
 };
@@ -141,10 +141,10 @@ export type {
   testResultsCreationAttributes,
   testsAttributes,
   testsCreationAttributes,
-  unitsAttributes,
-  unitsCreationAttributes,
   unitGroupsAttributes,
   unitGroupsCreationAttributes,
+  unitsAttributes,
+  unitsCreationAttributes,
   userEventAttendancesAttributes,
   userEventAttendancesCreationAttributes,
   usersAttributes,
@@ -177,8 +177,8 @@ export function initModels(sequelize: Sequelize) {
   const testResultValues = _testResultValues.initModel(sequelize);
   const testResults = _testResults.initModel(sequelize);
   const tests = _tests.initModel(sequelize);
-  const units = _units.initModel(sequelize);
   const unitGroups = _unitGroups.initModel(sequelize);
+  const units = _units.initModel(sequelize);
   const userEventAttendances = _userEventAttendances.initModel(sequelize);
   const users = _users.initModel(sequelize);
 
@@ -254,21 +254,23 @@ export function initModels(sequelize: Sequelize) {
   tests.hasMany(testFillables, { foreignKey: "testId"});
   testResults.belongsTo(tests, { foreignKey: "testId"});
   tests.hasMany(testResults, { foreignKey: "testId"});
+  units.belongsTo(unitGroups, { foreignKey: "unitGroupId"});
+  unitGroups.hasMany(units, { foreignKey: "unitGroupId"});
   testFillables.belongsTo(units, { foreignKey: "unitId"});
   units.hasMany(testFillables, { foreignKey: "unitId"});
   units.belongsTo(units, { foreignKey: "baseUnitId"});
   units.hasMany(units, { foreignKey: "baseUnitId"});
-  units.belongsTo(unitGroups, { foreignKey: "unitGroupId"});
-  unitGroups.hasMany(units, { foreignKey: "unitGroupId"});
   calSubscriptions.belongsTo(users, { foreignKey: "userId"});
   users.hasMany(calSubscriptions, { foreignKey: "userId"});
   calSubscriptions.belongsTo(users, { foreignKey: "guardianOfId"});
   users.hasMany(calSubscriptions, { foreignKey: "guardianOfId"});
-  eventUsers.belongsTo(users, { foreignKey: "userId"});
-  users.hasMany(eventUsers, { foreignKey: "userId"});
-  events.belongsTo(users, { foreignKey: "createdById"});
-  users.hasMany(events, { foreignKey: "createdById"});
-  passwordResets.belongsTo(users, { foreignKey: "userId"});
+  eventUsers.belongsTo(users, { foreignKey: "userId", as: 'user' });
+  users.hasMany(eventUsers, { foreignKey: "userId", as: 'eventUsers' });
+  events.belongsTo(users, { foreignKey: "athleteId", as: 'athlete' });
+  users.hasMany(events, { foreignKey: "athleteId", as: 'athleteEvents' });
+  events.belongsTo(users, { foreignKey: "createdById", as: 'createdBy' });
+  users.hasMany(events, { foreignKey: "createdById", as: 'createdEvents' });
+  passwordResets.belongsTo(users, { foreignKey: "userId", as: 'user' });
   users.hasMany(passwordResets, { foreignKey: "userId"});
   periods.belongsTo(users, { foreignKey: "createdById"});
   users.hasMany(periods, { foreignKey: "createdById"});
@@ -323,8 +325,8 @@ export function initModels(sequelize: Sequelize) {
     testResultValues: testResultValues,
     testResults: testResults,
     tests: tests,
-    units: units,
     unitGroups: unitGroups,
+    units: units,
     userEventAttendances: userEventAttendances,
     users: users,
   };

@@ -3,7 +3,7 @@ import { validate } from '@/middleware/validation';
 import { requireSignedIn, requireScope } from '@/middleware/auth';
 import { withTransaction } from '@/db/index';
 import { createEvent, getEventById } from '@/db/event';
-import { createEventSchema, updateAttendanceSchema } from '@/schemas/event';
+import { createEventSchema, createAthleteEventSchema, updateAttendanceSchema } from '@/schemas/event';
 import { AppError } from '@/middleware/errors';
 import { query } from '@/db/index';
 import { hasRoleInTeam } from '@/utils/authHelper';
@@ -15,6 +15,148 @@ import { Op } from 'sequelize';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const router: Router = Router();
+
+const resolveAthleteContext = (req: Request, teamId: string) => {
+  const user = req.user;
+  const userTeam = user?.teams.find(t => t.teamId === teamId);
+  if (!userTeam) {
+    throw new AppError('Team not found', 404, 'team_not_found');
+  }
+
+  const isStaff = userTeam.roles.some(r => ['owner', 'admin', 'coach'].includes(r.role));
+  const guardianRole = userTeam.roles.find(r => r.role === 'guardian' && r.guardianOf);
+  const isAthlete = userTeam.roles.some(r => r.role === 'athlete' && !r.guardianOf);
+
+  // Prefer the user's own athlete role when present; otherwise fall back to guarded athlete
+  const athleteId = isAthlete
+    ? user?.sub
+    : (guardianRole?.guardianOf || null);
+
+  return { isStaff, guardianRole, isAthlete, athleteId };
+};
+
+router.post('/team/:teamId/athlete', requireSignedIn, validate(createAthleteEventSchema), async (req: Request, res: Response) => {
+  const { teamId } = req.params as { teamId: string };
+  const { title, type, eventDate, durationInMinutes, notes, timezone } = req.body;
+
+  const { isStaff, guardianRole, isAthlete, athleteId } = resolveAthleteContext(req, teamId);
+
+  if (!athleteId) {
+    throw new AppError('Unauthorized', 403, 'unauthorized');
+  }
+
+  if (!['self_training', 'mental'].includes(type)) {
+    throw new AppError('Invalid event type', 400, 'invalid_event_type');
+  }
+
+  // Ensure user is active in team
+  const [teamUser] = await query(`
+    SELECT userId FROM team_users
+    WHERE teamId = ? AND userId = ?
+  `, [teamId, athleteId]) as Array<{ userId: string }>;
+
+  if (!teamUser) {
+    throw new AppError('User not in team', 404, 'user_not_in_team');
+  }
+
+  const eventPayload: any = {
+    title,
+    teamId,
+    type,
+    eventDate,
+    durationInMinutes,
+    notes: notes ?? null,
+    timezone: timezone || 'Europe/Helsinki',
+    registrationRequired: false,
+    forAllAthletes: false,
+    forAllStaff: true,
+    athleteId,
+    startTimeUnixSec: null,
+    endTimeUnixSec: null,
+    repeats: null,
+    repeatsOn: null,
+    repeatsUntilUnixSec: null,
+    status: 'published',
+  };
+
+  const result = await createEvent(eventPayload, req.user?.sub!);
+  const eventId = result.insertId;
+  const [event] = await getEventById(eventId.toString());
+
+  res.status(201).json({
+    success: true,
+    message: 'Athlete event created successfully',
+    data: event
+  });
+});
+
+router.put('/team/:teamId/athlete/:eventId', requireSignedIn, validate(createAthleteEventSchema.partial()), async (req: Request, res: Response) => {
+  const { teamId, eventId } = req.params as { teamId: string; eventId: string };
+  const updates = req.body;
+
+  const { isStaff, athleteId } = resolveAthleteContext(req, teamId);
+  const [event] = await getEventById(eventId);
+  if (!event || event.teamId !== teamId) {
+    throw new AppError('Event not found', 404, 'event_not_found');
+  }
+
+  // Staff can already edit via staff endpoint; allow here as well
+  if (!athleteId || event.athleteId !== athleteId) {
+    throw new AppError('Unauthorized', 403, 'unauthorized');
+  }
+
+  if (updates.type && !['self_training', 'mental'].includes(updates.type)) {
+    throw new AppError('Invalid event type', 400, 'invalid_event_type');
+  }
+
+  const merged = { ...event, ...updates };
+
+  await withTransaction(async (trx) => {
+    await trx.query(`
+      UPDATE events SET
+        title = ?,
+        type = ?,
+        notes = ?,
+        eventDate = ?,
+        durationInMinutes = ?,
+        timezone = ?
+      WHERE id = ? AND teamId = ?
+    `, [
+      merged.title,
+      merged.type,
+      merged.notes ?? null,
+      merged.eventDate,
+      merged.durationInMinutes ?? null,
+      merged.timezone || 'Europe/Helsinki',
+      eventId,
+      teamId
+    ]);
+  });
+
+  const [updatedEvent] = await getEventById(eventId);
+  res.status(200).json({
+    success: true,
+    message: 'Event updated successfully',
+    data: updatedEvent
+  });
+});
+
+router.delete('/team/:teamId/athlete/:eventId', requireSignedIn, async (req: Request, res: Response) => {
+  const { teamId, eventId } = req.params as { teamId: string; eventId: string };
+  const { isStaff, athleteId } = resolveAthleteContext(req, teamId);
+
+  const [event] = await getEventById(eventId);
+  if (!event || event.teamId !== teamId) {
+    throw new AppError('Event not found', 404, 'event_not_found');
+  }
+
+  if (!athleteId || event.athleteId !== athleteId) {
+    throw new AppError('Unauthorized', 403, 'unauthorized');
+  }
+
+  await query(`DELETE FROM events WHERE id = ?`, [eventId]);
+  res.json({ success: true, message: 'Event deleted' });
+});
 
 router.post('/team/:teamId', requireSignedIn, validate(createEventSchema), requireScope('event:create', 'team'), async (req: Request, res: Response) => {
   const { teamId } = req.params as { teamId: string };
@@ -562,6 +704,11 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
     },
     include: [
       {
+        model: models.users,
+        as: 'athlete',
+        attributes: ['id', 'firstName', 'lastName', 'email', 'fullName']
+      },
+      {
         model: models.locations,
         as: 'location'
       },
@@ -590,6 +737,13 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
 
   const event = eventModel.get({ plain: true });
 
+  const eventAny = event as Record<string, any>;
+  const athlete = eventAny['athlete'];
+  if (athlete) {
+    eventAny['athleteName'] = athlete.fullName || `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim();
+    eventAny['athleteEmail'] = athlete.email;
+  }
+
   // Check user's role in this team
   const userTeam = req.user?.teams.find(t => t.teamId === teamId);
   const isStaff = userTeam?.roles.some(r => ['owner', 'admin', 'coach'].includes(r.role)) || false;
@@ -606,6 +760,8 @@ router.get('/:eventId/team/:teamId', requireSignedIn, requireScope('event:read',
   if (isStaff) {
     hasAccess = true;
   } else if (event.createdById === checkUserId) {
+    hasAccess = true;
+  } else if (event.athleteId && event.athleteId === checkUserId) {
     hasAccess = true;
   } else if ((isAthlete || guardianRole) && event.forAllAthletes) {
     hasAccess = true;

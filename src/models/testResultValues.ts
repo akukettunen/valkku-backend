@@ -8,7 +8,7 @@ export interface testResultValuesAttributes {
   testResultId: number;
   testFillableId: number;
   value: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,7 +23,7 @@ export class testResultValues extends Model<testResultValuesAttributes, testResu
   testResultId!: number;
   testFillableId!: number;
   value!: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -112,6 +112,3 @@ export class testResultValues extends Model<testResultValuesAttributes, testResu
   });
   }
 }
-
-
-

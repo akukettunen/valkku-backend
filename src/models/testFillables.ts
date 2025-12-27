@@ -9,7 +9,7 @@ export interface testFillablesAttributes {
   testId: number;
   unitId: number;
   title: object;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +24,7 @@ export class testFillables extends Model<testFillablesAttributes, testFillablesC
   testId!: number;
   unitId!: number;
   title!: object;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -125,6 +125,3 @@ export class testFillables extends Model<testFillablesAttributes, testFillablesC
   });
   }
 }
-
-
-

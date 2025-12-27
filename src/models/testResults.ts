@@ -10,12 +10,12 @@ export interface testResultsAttributes {
   id: number;
   userId: string;
   testId: number;
-  testEventId?: number | null;
+  testEventId?: number;
   date: string;
   createdById: string;
-  teamId?: string | null;
+  teamId?: string;
   tryOrder: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,12 +29,12 @@ export class testResults extends Model<testResultsAttributes, testResultsCreatio
   id!: number;
   userId!: string;
   testId!: number;
-  testEventId?: number | null;
+  testEventId?: number;
   date!: string;
   createdById!: string;
-  teamId?: string | null;
+  teamId?: string;
   tryOrder!: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -200,6 +200,3 @@ export class testResults extends Model<testResultsAttributes, testResultsCreatio
   });
   }
 }
-
-
-

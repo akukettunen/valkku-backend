@@ -94,7 +94,7 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
   hasEventUser!: Sequelize.HasManyHasAssociationMixin<eventUsers, eventUsersId>;
   hasEventUsers!: Sequelize.HasManyHasAssociationsMixin<eventUsers, eventUsersId>;
   countEventUsers!: Sequelize.HasManyCountAssociationsMixin;
-  // users hasMany events via createdById
+  // users hasMany events via athleteId
   events!: events[];
   getEvents!: Sequelize.HasManyGetAssociationsMixin<events>;
   setEvents!: Sequelize.HasManySetAssociationsMixin<events, eventsId>;
@@ -106,6 +106,18 @@ export class users extends Model<usersAttributes, usersCreationAttributes> imple
   hasEvent!: Sequelize.HasManyHasAssociationMixin<events, eventsId>;
   hasEvents!: Sequelize.HasManyHasAssociationsMixin<events, eventsId>;
   countEvents!: Sequelize.HasManyCountAssociationsMixin;
+  // users hasMany events via createdById
+  createdByEvents!: events[];
+  getCreatedByEvents!: Sequelize.HasManyGetAssociationsMixin<events>;
+  setCreatedByEvents!: Sequelize.HasManySetAssociationsMixin<events, eventsId>;
+  addCreatedByEvent!: Sequelize.HasManyAddAssociationMixin<events, eventsId>;
+  addCreatedByEvents!: Sequelize.HasManyAddAssociationsMixin<events, eventsId>;
+  createCreatedByEvent!: Sequelize.HasManyCreateAssociationMixin<events>;
+  removeCreatedByEvent!: Sequelize.HasManyRemoveAssociationMixin<events, eventsId>;
+  removeCreatedByEvents!: Sequelize.HasManyRemoveAssociationsMixin<events, eventsId>;
+  hasCreatedByEvent!: Sequelize.HasManyHasAssociationMixin<events, eventsId>;
+  hasCreatedByEvents!: Sequelize.HasManyHasAssociationsMixin<events, eventsId>;
+  countCreatedByEvents!: Sequelize.HasManyCountAssociationsMixin;
   // users belongsToMany events via userId and eventId
   eventIdEvents!: events[];
   getEventIdEvents!: Sequelize.BelongsToManyGetAssociationsMixin<events>;

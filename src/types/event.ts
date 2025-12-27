@@ -3,7 +3,7 @@ import { OBJECT_SCOPE } from "./general";
 
 export type EVENT_PLAN_PART_SCOPE = 'global' | 'club' | 'team' | 'user';
 export type EVENT_REPEATS = null | 'daily' | 'weekly' | 'monthly';
-export type EVENT_TYPE = 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event';
+export type EVENT_TYPE = 'practise' | 'match' | 'meeting' | 'self_training' | 'other_event' | 'mental';
 export type EVENT_STATUS = 'draft' | 'published' | 'archived';
 export type LocalizationObject = {
   [key: string]: string;
@@ -38,6 +38,7 @@ export interface Event {
   registrationRequired?: boolean;
 
   createdById: string;
+  athleteId?: string | null;
   deleted: boolean;
   createdAt: Date;
   updatedAt: Date;

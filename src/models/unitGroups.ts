@@ -72,6 +72,3 @@ export class unitGroups extends Model<unitGroupsAttributes, unitGroupsCreationAt
   });
   }
 }
-
-
-

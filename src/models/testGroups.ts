@@ -5,20 +5,20 @@ import type { tests, testsId } from './tests';
 export interface testGroupsAttributes {
   id: number;
   title: object;
-  sort_order: number;
-  deletedAt?: Date | null;
+  sortOrder: number;
+  deletedAt?: Date;
 }
 
 export type testGroupsPk = "id";
 export type testGroupsId = testGroups[testGroupsPk];
-export type testGroupsOptionalAttributes = "id" | "sort_order" | "deletedAt";
+export type testGroupsOptionalAttributes = "id" | "sortOrder" | "deletedAt";
 export type testGroupsCreationAttributes = Optional<testGroupsAttributes, testGroupsOptionalAttributes>;
 
 export class testGroups extends Model<testGroupsAttributes, testGroupsCreationAttributes> implements testGroupsAttributes {
   id!: number;
   title!: object;
-  sort_order!: number;
-  deletedAt?: Date | null;
+  sortOrder!: number;
+  deletedAt?: Date;
 
   // testGroups hasMany tests via testGroupId
   tests!: tests[];
@@ -45,10 +45,11 @@ export class testGroups extends Model<testGroupsAttributes, testGroupsCreationAt
       type: DataTypes.JSON,
       allowNull: false
     },
-    sort_order: {
+    sortOrder: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      defaultValue: 0
+      defaultValue: 0,
+      field: 'sort_order'
     },
     deletedAt: {
       type: DataTypes.DATE,

@@ -7,7 +7,7 @@ export interface testEventTestsAttributes {
   id: number;
   testEventId: number;
   testId: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,7 +21,7 @@ export class testEventTests extends Model<testEventTestsAttributes, testEventTes
   id!: number;
   testEventId!: number;
   testId!: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -106,6 +106,3 @@ export class testEventTests extends Model<testEventTestsAttributes, testEventTes
   });
   }
 }
-
-
-

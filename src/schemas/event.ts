@@ -53,6 +53,15 @@ export const createEventSchema = z.object({
   }
 })
 
+export const createAthleteEventSchema = z.object({
+  title: z.string().max(400),
+  type: z.enum(['self_training', 'mental']).default('self_training'),
+  eventDate: z.string(),
+  durationInMinutes: z.number().positive(),
+  notes: z.string().max(1000).nullable().optional(),
+  timezone: z.string().max(50).optional().default('Europe/Helsinki'),
+}).strict();
+
 export const createEventPlanPartSchema = z.object({
   durationInMinutes: z.number().optional(),
   typeId: z.number().optional(),

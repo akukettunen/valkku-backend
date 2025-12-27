@@ -11,12 +11,12 @@ export interface testsAttributes {
   id: number;
   title: object;
   notes: object;
-  teamId?: string | null;
+  teamId?: string;
   createdById: string;
   scope: 'global' | 'club' | 'team';
   testGroupId: number;
   decimals: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,12 +30,12 @@ export class tests extends Model<testsAttributes, testsCreationAttributes> imple
   id!: number;
   title!: object;
   notes!: object;
-  teamId?: string | null;
+  teamId?: string;
   createdById!: string;
   scope!: 'global' | 'club' | 'team';
   testGroupId!: number;
   decimals!: number;
-  deletedAt?: Date | null;
+  deletedAt?: Date;
   createdAt!: Date;
   updatedAt!: Date;
 

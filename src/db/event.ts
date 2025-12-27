@@ -13,6 +13,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     type,
     ownNotes,
     coachesNotes,
+    athleteId,
     eventDate,
     startTimeUnixSec,
     endTimeUnixSec,
@@ -33,7 +34,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
   const toNull = (v: any) => (v === undefined ? null : v);
   const exec = trx ? trx.query.bind(trx) : query;
   const result = await exec(`
-    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, durationInMinutes, baseEventId, planId, forAllAthletes, forAllStaff, registrationRequired) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (id, teamId, title, notes, type, ownNotes, coachesNotes, eventDate, startTimeUnixSec, endTimeUnixSec, locationId, timezone, repeats, repeatsOn, repeatsUntilUnixSec, status, createdById, athleteId, durationInMinutes, baseEventId, planId, forAllAthletes, forAllStaff, registrationRequired) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     toNull(id),
     teamId,
@@ -52,6 +53,7 @@ export const createEvent = async (event: Event, createdById: string, trx?: Trans
     toNull(repeatsUntilUnixSec),
     toNull(status) || 'published',
     createdById,
+    toNull(athleteId),
     toNull(durationInMinutes),
     toNull(baseEventId),
     toNull(planId),
