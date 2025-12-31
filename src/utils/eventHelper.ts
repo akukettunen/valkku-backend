@@ -427,7 +427,7 @@ export const getFilteredTeamEvents = async (
     include
   });
 
-  const events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
+  let events = eventRows.map(row => row.get({ plain: true })) as unknown as Event[];
 
   // Attach athlete name/email for convenience
   for (const ev of events as any[]) {
