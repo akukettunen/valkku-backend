@@ -11,7 +11,7 @@ export interface testEventsAttributes {
   date: string;
   name?: object;
   createdById: string;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,7 +27,7 @@ export class testEvents extends Model<testEventsAttributes, testEventsCreationAt
   date!: string;
   name?: object;
   createdById!: string;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 

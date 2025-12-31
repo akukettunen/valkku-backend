@@ -36,7 +36,7 @@ router.put('/groups/admin/order', requireSignedIn, requireSuperAdmin, async (req
     await sequelize.transaction(async (t) => {
         for (const item of items) {
             await models.testGroups.update(
-                { sort_order: item.sort_order },
+                { sortOrder: item.sort_order },
                 { where: { id: item.id, deletedAt: null }, transaction: t }
             );
         }
@@ -144,7 +144,6 @@ router.post('/admin', requireSignedIn, requireSuperAdmin, async (req: Request, r
       notes: notes || {},
       testGroupId,
       scope: 'global',
-      teamId: null,
       createdById,
       decimals: decimals || 0
     };
@@ -611,10 +610,9 @@ router.post('/results', requireSignedIn, async (req: Request, res: Response) => 
       const resultData: testResultsCreationAttributes = {
           userId,
           testId,
-          testEventId: null,
           date,
           createdById,
-          teamId: teamId || null,
+          ...(teamId ? { teamId } : {}),
           tryOrder: entry.tryOrder || 1
       };
       result = await models.testResults.create(resultData, { transaction: t });
@@ -815,7 +813,7 @@ router.post('/events', requireSignedIn, requireScope('test-event:create', 'team'
         const eventData: testEventsCreationAttributes = {
             teamId,
             date,
-            name: name ? { fi: name, en: name } : null,
+            ...(name ? { name: { fi: name, en: name } } : {}),
             createdById
         };
 

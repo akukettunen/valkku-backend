@@ -6,7 +6,7 @@ export interface testGroupsAttributes {
   id: number;
   title: object;
   sortOrder: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
 }
 
 export type testGroupsPk = "id";
@@ -18,7 +18,7 @@ export class testGroups extends Model<testGroupsAttributes, testGroupsCreationAt
   id!: number;
   title!: object;
   sortOrder!: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
 
   // testGroups hasMany tests via testGroupId
   tests!: tests[];

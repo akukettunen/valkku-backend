@@ -16,7 +16,7 @@ export interface testsAttributes {
   scope: 'global' | 'club' | 'team';
   testGroupId: number;
   decimals: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,7 +35,7 @@ export class tests extends Model<testsAttributes, testsCreationAttributes> imple
   scope!: 'global' | 'club' | 'team';
   testGroupId!: number;
   decimals!: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 

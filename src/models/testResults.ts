@@ -15,7 +15,7 @@ export interface testResultsAttributes {
   createdById: string;
   teamId?: string;
   tryOrder: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,7 +34,7 @@ export class testResults extends Model<testResultsAttributes, testResultsCreatio
   createdById!: string;
   teamId?: string;
   tryOrder!: number;
-  deletedAt?: Date;
+  deletedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 
