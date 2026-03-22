@@ -477,6 +477,42 @@ router.patch('/:teamId/user/:userId/role', requireSignedIn, requireScope('member
   });
 });
 
+const updateTeamUserNameSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+});
+
+router.patch('/:teamId/user/:userId/name', requireSignedIn, requireScope('user:update', 'team'), validate(updateTeamUserNameSchema), async (req: Request, res: Response) => {
+  const { teamId, userId } = req.params;
+  const { firstName, lastName } = req.body as { firstName?: string; lastName?: string };
+
+  if (!teamId || !userId) {
+    throw new AppError('Invalid parameters', 400, 'something_went_wrong');
+  }
+
+  if (!firstName && !lastName) {
+    throw new AppError('At least one of firstName or lastName is required', 400, 'no_name_provided');
+  }
+
+  // Check if the target user is an athlete in this team
+  const teamUserRoles = await getTeamUserRoles(teamId, userId);
+  if (!teamUserRoles || !teamUserRoles.some(r => r.role === 'athlete')) {
+    throw new AppError('User is not an athlete in this team', 403, 'user_not_athlete');
+  }
+
+  const updates: { firstName?: string; lastName?: string } = {};
+  if (firstName !== undefined) updates.firstName = firstName;
+  if (lastName !== undefined) updates.lastName = lastName;
+
+  await updateUserDetails(updates, userId);
+
+  res.json({
+    success: true,
+    message: 'User name updated successfully',
+    code: 'user_name_updated_successfully'
+  });
+});
+
 router.post('/join', async (req: Request, res: Response) => {
   const { token, password, repeatPassword, firstName, lastName, preferredLanguage } = req.body;
 

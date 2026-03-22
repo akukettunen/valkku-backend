@@ -316,8 +316,16 @@ router.get('/groups', requireSignedIn, async (req: Request, res: Response) => {
 
 // GET /test/results - Get results
 router.get('/results', requireSignedIn, async (req: Request, res: Response) => {
-  const { userId, teamId, testId, testEventId, startDate, endDate, excludeEventResults } = req.query;
+  const { userId, userIds, teamId, testId, testEventId, startDate, endDate, excludeEventResults } = req.query;
   const user = req.user;
+
+  // Parse userIds from comma-separated string or use single userId
+  let requestedUserIds: string[] = [];
+  if (userIds && typeof userIds === 'string') {
+      requestedUserIds = userIds.split(',').map(id => id.trim()).filter(Boolean);
+  } else if (userId) {
+      requestedUserIds = [String(userId)];
+  }
 
   const where: any = { deletedAt: null };
 
@@ -338,12 +346,13 @@ router.get('/results', requireSignedIn, async (req: Request, res: Response) => {
               if (r.guardianOf) allowedUserIds.push(r.guardianOf);
           });
 
-          // If querying for specific userId, validate it
-          if (userId) {
-              if (!allowedUserIds.includes(String(userId))) {
+          // If querying for specific userIds, validate them
+          if (requestedUserIds.length > 0) {
+              const validUserIds = requestedUserIds.filter(id => allowedUserIds.includes(id));
+              if (validUserIds.length === 0) {
                   return res.status(200).json({ success: true, data: [] });
               }
-              where.userId = userId;
+              where.userId = validUserIds.length === 1 ? validUserIds[0] : { [Op.in]: validUserIds };
           } else {
               // Restrict to allowed IDs
               if (allowedUserIds.length > 0) {
@@ -353,13 +362,15 @@ router.get('/results', requireSignedIn, async (req: Request, res: Response) => {
               }
           }
       } else {
-          // Staff can see all, so if userId is provided, use it
-          if (userId) where.userId = userId;
+          // Staff can see all, so if userIds are provided, use them
+          if (requestedUserIds.length > 0) {
+              where.userId = requestedUserIds.length === 1 ? requestedUserIds[0] : { [Op.in]: requestedUserIds };
+          }
       }
       where.teamId = teamId;
   } else {
       // No team context? Restrict to own results to be safe
-      if (userId && String(userId) !== user?.sub) {
+      if (requestedUserIds.length > 0 && !requestedUserIds.includes(user?.sub || '')) {
            return res.status(200).json({ success: true, data: [] });
       }
       if (user?.sub) where.userId = user.sub;

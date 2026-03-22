@@ -813,8 +813,43 @@ router.delete('/:eventId/team/:teamId', requireSignedIn, requireScope('event:del
     await query(`DELETE FROM events WHERE baseEventId = ? OR id = ?`, [baseId, baseId]);
     return res.json({ success: true, message: 'Event series deleted' });
   } else {
-    // Delete single event only
-    await query(`DELETE FROM events WHERE id = ?`, [eventId]);
+    await withTransaction(async (trx) => {
+      const numericEventId = Number(eventId);
+      const numericBaseEventId = Number(event.baseEventId);
+      const deletingSeriesBase = Number.isFinite(numericBaseEventId) && numericBaseEventId === numericEventId;
+
+      // `baseEventId` cascades on delete, so when deleting the base occurrence
+      // we must promote another occurrence first to avoid deleting the whole series.
+      if (deletingSeriesBase) {
+        const replacementRows = await trx.query(`
+          SELECT id
+          FROM events
+          WHERE baseEventId = ? AND id != ? AND teamId = ?
+          ORDER BY eventDate ASC, id ASC
+          LIMIT 1
+        `, [numericBaseEventId, numericEventId, teamId]) as Array<{ id: number }>;
+
+        const replacementBaseId = replacementRows[0]?.id;
+
+        if (replacementBaseId) {
+          await trx.query(`
+            UPDATE events
+            SET baseEventId = ?
+            WHERE id = ? AND teamId = ?
+          `, [replacementBaseId, replacementBaseId, teamId]);
+
+          await trx.query(`
+            UPDATE events
+            SET baseEventId = ?
+            WHERE baseEventId = ? AND id != ? AND teamId = ?
+          `, [replacementBaseId, numericBaseEventId, numericEventId, teamId]);
+        }
+      }
+
+      // Delete single event only
+      await trx.query(`DELETE FROM events WHERE id = ? AND teamId = ?`, [eventId, teamId]);
+    });
+
     return res.json({ success: true, message: 'Event deleted' });
   }
 });

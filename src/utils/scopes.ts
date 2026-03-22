@@ -38,6 +38,7 @@ export default {
     "plan-part-type:delete": ["owner", "admin", "coach"],
 
     "user:read": ["owner", "admin", "coach"],
+    "user:update": ["owner", "admin", "coach"],
 
     "plan:create": ["owner", "admin", "coach"],
     "plan:read": ["owner", "admin", "coach", "athlete", "guardian"],
