@@ -2,18 +2,18 @@ import { query, Transaction } from '@/db/index';
 
 export type PasswordResetRow = {
   id: number;
-  user_id: string;
-  token_hash: string;
-  created_at: string; // DATETIME as string due to dateStrings
-  expires_at: string;
+  userId: string;
+  tokenHash: string;
+  createdAt: string; // DATETIME as string due to dateStrings
+  expiresAt: string;
   used: 0 | 1;
-  used_at: string | null;
+  usedAt: string | null;
 }
 
 export const createPasswordReset = async (userId: string, tokenHash: string, expiresAt: Date) => {
   const result = await query(
     `
-    INSERT INTO password_resets (user_id, token_hash, expires_at)
+    INSERT INTO password_resets (userId, tokenHash, expiresAt)
     VALUES (?, ?, ?)
     `,
     [userId, tokenHash, expiresAt]
@@ -23,7 +23,7 @@ export const createPasswordReset = async (userId: string, tokenHash: string, exp
 
 export const findByTokenHash = async (tokenHash: string): Promise<PasswordResetRow | null> => {
   const rows = await query(
-    `SELECT * FROM password_resets WHERE token_hash = ? LIMIT 1`,
+    `SELECT * FROM password_resets WHERE tokenHash = ? LIMIT 1`,
     [tokenHash]
   ) as PasswordResetRow[];
   return rows[0] || null;
@@ -31,14 +31,14 @@ export const findByTokenHash = async (tokenHash: string): Promise<PasswordResetR
 
 export const invalidateAllForUser = async (userId: string) => {
   return await query(
-    `UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE user_id = ? AND used = FALSE`,
+    `UPDATE password_resets SET used = TRUE, usedAt = NOW(3) WHERE userId = ? AND used = FALSE`,
     [userId]
   );
 };
 
 export const markUsedById = async (id: number) => {
   return await query(
-    `UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE id = ? AND used = FALSE`,
+    `UPDATE password_resets SET used = TRUE, usedAt = NOW(3) WHERE id = ? AND used = FALSE`,
     [id]
   );
 };
@@ -63,7 +63,7 @@ export const finalizeResetTransaction = async (
     throw new Error('reset_already_used');
   }
   const now = new Date();
-  const expiresAt = new Date(row.expires_at);
+  const expiresAt = new Date(row.expiresAt);
   if (expiresAt.getTime() < now.getTime()) {
     throw new Error('reset_expired');
   }
@@ -74,7 +74,7 @@ export const finalizeResetTransaction = async (
   );
 
   await tr.query(
-    `UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE id = ?`,
+    `UPDATE password_resets SET used = TRUE, usedAt = NOW(3) WHERE id = ?`,
     [resetId]
   );
 };

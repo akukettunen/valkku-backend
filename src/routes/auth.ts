@@ -254,7 +254,7 @@ router.post('/password-reset/verify', validate(verifyPasswordResetSchema), async
     throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
   }
   const now = Date.now();
-  const expiresAt = new Date(row.expires_at).getTime();
+  const expiresAt = new Date(row.expiresAt).getTime();
   if (expiresAt < now) {
     throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
   }
@@ -274,7 +274,7 @@ router.post('/password-reset/confirm', validate(confirmPasswordResetSchema), asy
   }
 
   const now = Date.now();
-  const expiresAt = new Date(row.expires_at).getTime();
+  const expiresAt = new Date(row.expiresAt).getTime();
   if (expiresAt < now) {
     throw new AppError('Invalid or expired token', 400, 'invalid_reset_token');
   }
@@ -283,12 +283,12 @@ router.post('/password-reset/confirm', validate(confirmPasswordResetSchema), asy
 
   // Transactionally set password and mark token used
   await withTransaction(async (trx) => {
-    await trx.query(`UPDATE users SET passwordHash = ? WHERE id = ?`, [newHash, row.user_id]);
-    await trx.query(`UPDATE password_resets SET used = TRUE, used_at = NOW(3) WHERE id = ?`, [row.id]);
+    await trx.query(`UPDATE users SET passwordHash = ? WHERE id = ?`, [newHash, row.userId]);
+    await trx.query(`UPDATE password_resets SET used = TRUE, usedAt = NOW(3) WHERE id = ?`, [row.id]);
   });
 
   // Revoke all sessions for this user after password change
-  await revokeAllUserSessions(row.user_id);
+  await revokeAllUserSessions(row.userId);
 
   return res.status(200).json({ success: true, message: 'Password reset successful', code: 'password_reset_success' });
 });
